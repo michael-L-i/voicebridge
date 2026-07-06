@@ -3,12 +3,23 @@ import sounddevice as sd
 
 from voicebridge.daemon.audio_out import audio_lock
 
-# A fixed RMS threshold is simple and good enough for a single-user local
-# tool -- an adaptive/calibrated noise floor would be more robust but isn't
-# worth the complexity yet.
-_SILENCE_RMS_THRESHOLD = 0.01
 _BLOCK_MS = 50
-_MIN_LISTEN_MS = 300
+_MIN_LISTEN_MS = 500
+# Read and discard this much audio right after opening the mic stream, before
+# any VAD evaluation starts. Covers two things at once: audio device startup
+# transients, and any tail-end echo/reverb still trailing in the room from
+# voice_speak's just-finished playback -- sd.play(blocking=True) can return
+# slightly before the sound has actually finished decaying acoustically,
+# and without this settle window that tail gets misread as the user talking.
+_SETTLE_MS = 300
+# The speech-vs-silence threshold is calibrated from the settle window's
+# ambient noise level instead of a fixed constant, so the same code works
+# across different mics/rooms instead of only whatever level was assumed at
+# write time. Median (not mean) so one loud transient during settling
+# doesn't skew the whole calibration.
+_THRESHOLD_MULTIPLIER = 3.0
+_MIN_THRESHOLD = 0.008
+_MAX_THRESHOLD = 0.05
 
 
 def listen(
@@ -22,6 +33,7 @@ def listen(
     max_blocks = max(1, int(max_listen_ms / _BLOCK_MS))
     silence_blocks_needed = max(1, int(silence_ms / _BLOCK_MS))
     min_blocks = max(1, int(_MIN_LISTEN_MS / _BLOCK_MS))
+    settle_blocks = max(1, int(_SETTLE_MS / _BLOCK_MS))
 
     chunks = []
     consecutive_silence = 0
@@ -32,13 +44,21 @@ def listen(
     # narration mid-listen just waits its turn instead of talking over you.
     with audio_lock:
         with sd.InputStream(samplerate=sample_rate, channels=1, dtype="float32") as stream:
+            settle_rms = []
+            for _ in range(settle_blocks):
+                block, _overflowed = stream.read(block_samples)
+                settle_rms.append(float(np.sqrt(np.mean(np.square(block[:, 0])))))
+
+            ambient = sorted(settle_rms)[len(settle_rms) // 2] if settle_rms else 0.0
+            threshold = min(_MAX_THRESHOLD, max(_MIN_THRESHOLD, ambient * _THRESHOLD_MULTIPLIER))
+
             for i in range(max_blocks):
                 block, _overflowed = stream.read(block_samples)
                 block = block[:, 0]
                 chunks.append(block)
 
                 rms = float(np.sqrt(np.mean(np.square(block))))
-                if rms > _SILENCE_RMS_THRESHOLD:
+                if rms > threshold:
                     has_spoken = True
                     consecutive_silence = 0
                 else:
