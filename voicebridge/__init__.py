@@ -1,0 +1,3 @@
+from voicebridge._compat import patch_mlx_lm_transformers_compat
+
+patch_mlx_lm_transformers_compat()

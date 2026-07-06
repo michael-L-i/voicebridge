@@ -1,0 +1,29 @@
+[daemon]
+host = "127.0.0.1"
+port = 8756
+
+[summarizer]
+model = "mlx-community/Qwen2.5-3B-Instruct-4bit"
+max_tokens = 80
+context_window_summaries = 3
+
+[tts]
+provider = "kokoro"
+model = "mlx-community/Kokoro-82M-bf16"
+voice = "af_heart"
+speed = 1.0
+
+[stt]
+provider = "parakeet"
+model = "mlx-community/parakeet-tdt-0.6b-v3"
+silence_ms = 800
+max_listen_ms = 30000
+
+[narration]
+min_narrate_chars = 40
+narrate_stop = true
+narrate_subagent_stop = true
+
+[audio]
+input_device = "default"
+output_device = "default"
