@@ -13,12 +13,18 @@ dependencies = [
   "mlx-audio>=0.4.4",
   # Kokoro's text frontend needs these, but mlx-audio doesn't declare them --
   # misaki[en]'s own extra pins an old spacy/thinc/blis chain that fails to
-  # build on Python 3.13, so these are pinned loose here instead and left for
-  # pip to resolve modern prebuilt wheels for.
+  # build on Python 3.13 (confirmed still true), so these are declared loose
+  # here instead and left for pip to resolve modern prebuilt wheels for.
+  # Two of these must be the exact packages misaki's own [en] extra would
+  # have pulled in, not generic equivalents: misaki>=0.9's espeak.py imports
+  # espeakng-loader unconditionally and calls a phonemizer-fork-only API
+  # (EspeakWrapper.set_data_path) -- plain `phonemizer` (no "-fork") lacks
+  # that method and fails at import time.
   "misaki",
   "spacy",
   "num2words",
-  "phonemizer",
+  "phonemizer-fork",
+  "espeakng-loader",
   "fastapi>=0.115",
   "uvicorn>=0.32",
   "httpx>=0.27",

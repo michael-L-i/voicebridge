@@ -1,0 +1,14 @@
+{
+  "name": "voicebridge-marketplace",
+  "owner": {
+    "name": "Michael Li"
+  },
+  "description": "Marketplace for voicebridge, a fully local voice companion for Claude Code on Apple Silicon.",
+  "plugins": [
+    {
+      "name": "voicebridge",
+      "source": "./",
+      "description": "A fully local voice companion for Claude Code on Apple Silicon -- talk to Claude instead of typing, with no cloud API keys."
+    }
+  ]
+}

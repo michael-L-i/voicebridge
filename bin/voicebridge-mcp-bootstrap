@@ -1,0 +1,55 @@
+#!/bin/bash
+# Declared as this plugin's MCP server command in .mcp.json. Ensures a
+# private venv with voicebridge + its heavy ML deps (mlx-lm, mlx-audio,
+# misaki, spacy, ...) exists under CLAUDE_PLUGIN_DATA, building it on first
+# run (or after a plugin update changes pyproject.toml), then execs into the
+# real voicebridge-mcp entrypoint inside that venv.
+#
+# IMPORTANT: stdout is the live MCP stdio JSON-RPC channel. Every log line in
+# this script MUST go to stderr (>&2) -- writing anything to stdout before
+# the final exec corrupts the protocol handshake Claude Code expects.
+set -euo pipefail
+
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}"
+DATA_DIR="${CLAUDE_PLUGIN_DATA}"
+VENV_DIR="${DATA_DIR}/venv"
+MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
+PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
+
+mkdir -p "${DATA_DIR}"
+
+# Marker = hash of pyproject.toml only, not the whole tree: a dependency
+# change (plugin update) invalidates the venv and forces a rebuild; a
+# pure-code change doesn't, since the editable install already reflects it.
+CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" | awk '{print $1}')
+
+NEEDS_INSTALL=1
+if [ -f "${MARKER_FILE}" ] && [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]; then
+  NEEDS_INSTALL=0
+fi
+
+if [ "${NEEDS_INSTALL}" = "1" ]; then
+  echo "[voicebridge] setting up local voice models -- first run only," \
+       "can take a few minutes (dependency install; model weights download" \
+       "lazily the first time you use /voicebridge:voice-code)." >&2
+
+  PYTHON_BIN=$(command -v python3.12 || command -v python3.11 || command -v python3 || true)
+  if [ -z "${PYTHON_BIN}" ]; then
+    echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11+" \
+         "(e.g. brew install python@3.12) and start a new session." >&2
+    exit 1
+  fi
+
+  rm -rf "${VENV_DIR}"
+  "${PYTHON_BIN}" -m venv "${VENV_DIR}"
+  "${VENV_DIR}/bin/pip" install --quiet --upgrade pip >&2
+  if ! "${VENV_DIR}/bin/pip" install --quiet -e "${PLUGIN_ROOT}" >&2; then
+    echo "[voicebridge] ERROR: dependency install failed. Retry manually:" >&2
+    echo "  ${VENV_DIR}/bin/pip install -e ${PLUGIN_ROOT}" >&2
+    exit 1
+  fi
+  echo "${CURRENT_HASH}" > "${MARKER_FILE}"
+  echo "[voicebridge] setup complete." >&2
+fi
+
+exec "${VENV_DIR}/bin/voicebridge-mcp"

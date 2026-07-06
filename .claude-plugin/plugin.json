@@ -1,0 +1,9 @@
+{
+  "name": "voicebridge",
+  "version": "0.1.0",
+  "description": "A fully local voice companion for Claude Code on Apple Silicon -- talk to Claude instead of typing, with no cloud API keys.",
+  "author": {
+    "name": "Michael Li"
+  },
+  "license": "MIT"
+}

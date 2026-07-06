@@ -1,12 +1,11 @@
 import os
-import subprocess
-import sys
 import time
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 
 from voicebridge.config import load_config
+from voicebridge.daemon import lifecycle
 
 _config = load_config()
 _BASE_URL = f"http://{_config.daemon.host}:{_config.daemon.port}"
@@ -14,6 +13,11 @@ _BASE_URL = f"http://{_config.daemon.host}:{_config.daemon.port}"
 # server -- it's how we know which session a tool call belongs to without
 # needing the agent to pass it explicitly.
 _SESSION_ID = os.environ.get("CLAUDE_CODE_SESSION_ID", "unknown-session")
+
+# A genuine first-ever cold start downloads and loads Qwen2.5-3B + Kokoro-82M
+# + Parakeet (several GB total) inside the daemon's own startup -- 60s isn't
+# enough for that, only for a warm restart.
+_DAEMON_START_TIMEOUT_S = 300
 
 mcp = FastMCP("voicebridge")
 
@@ -25,20 +29,17 @@ def _ensure_daemon_running() -> None:
     except Exception:
         pass
 
-    subprocess.Popen(
-        [sys.executable, "-m", "voicebridge.daemon.server"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    for _ in range(60):
+    lifecycle.start_background()
+    for _ in range(_DAEMON_START_TIMEOUT_S):
         time.sleep(1)
         try:
             httpx.get(f"{_BASE_URL}/health", timeout=2).raise_for_status()
             return
         except Exception:
             continue
-    raise RuntimeError("voicebridge daemon did not become healthy within 60s of starting it")
+    raise RuntimeError(
+        f"voicebridge daemon did not become healthy within {_DAEMON_START_TIMEOUT_S}s of starting it"
+    )
 
 
 @mcp.tool()
@@ -72,6 +73,16 @@ def voice_listen(timeout_ms: int = 30000, silence_ms: int = 800) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+@mcp.tool()
+def voice_stop() -> dict:
+    """Shut down the voicebridge daemon and free the MLX models it holds in
+    memory (several GB of RAM). Call this once, at the very end of a
+    /voice-code conversation after the final spoken goodbye -- not between
+    turns."""
+    stopped = lifecycle.stop_background()
+    return {"stopped": stopped}
 
 
 @mcp.tool()

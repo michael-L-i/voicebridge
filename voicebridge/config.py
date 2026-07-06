@@ -1,10 +1,15 @@
+import os
 import shutil
 import tomllib
 from pathlib import Path
 
 from pydantic import BaseModel
 
-CONFIG_DIR = Path.home() / ".voicebridge"
+# Under the Claude Code plugin, .mcp.json sets this to ${CLAUDE_PLUGIN_DATA}
+# (a persistent per-plugin data dir) so config/state/pid/log live there
+# instead of a path hardcoded to one machine. Falls back to ~/.voicebridge
+# for the direct-Python dev workflow (doctor, start, etc. run by hand).
+CONFIG_DIR = Path(os.environ.get("VOICEBRIDGE_DATA_DIR", str(Path.home() / ".voicebridge")))
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"
 
@@ -34,12 +39,6 @@ class STTConfig(BaseModel):
     max_listen_ms: int = 30000
 
 
-class NarrationConfig(BaseModel):
-    min_narrate_chars: int = 40
-    narrate_stop: bool = True
-    narrate_subagent_stop: bool = True
-
-
 class AudioConfig(BaseModel):
     input_device: str = "default"
     output_device: str = "default"
@@ -50,7 +49,6 @@ class Config(BaseModel):
     summarizer: SummarizerConfig = SummarizerConfig()
     tts: TTSConfig = TTSConfig()
     stt: STTConfig = STTConfig()
-    narration: NarrationConfig = NarrationConfig()
     audio: AudioConfig = AudioConfig()
 
 

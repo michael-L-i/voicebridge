@@ -19,11 +19,6 @@ model = "mlx-community/parakeet-tdt-0.6b-v3"
 silence_ms = 800
 max_listen_ms = 30000
 
-[narration]
-min_narrate_chars = 40
-narrate_stop = true
-narrate_subagent_stop = true
-
 [audio]
 input_device = "default"
 output_device = "default"

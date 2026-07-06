@@ -2,8 +2,8 @@
 description: Start an interactive voice conversation using voicebridge
 ---
 
-You are entering an active voice conversation using the `mcp__voicebridge__voice_speak`
-and `mcp__voicebridge__voice_listen` tools.
+You are entering an active voice conversation using the `mcp__voicebridge__voice_speak`,
+`mcp__voicebridge__voice_listen`, and `mcp__voicebridge__voice_stop` tools.
 
 1. Speak first: call `voice_speak` with a brief, casual one-sentence greeting.
 2. Call `voice_listen` for the user's reply. Treat the transcript as their next
@@ -15,12 +15,13 @@ and `mcp__voicebridge__voice_listen` tools.
    lists -- this is spoken aloud.
 4. Go back to step 2 and keep looping.
 5. If the transcript sounds like "stop", "that's all", "goodbye", or similar,
-   say a short goodbye via `voice_speak` and end the conversation -- don't call
+   say a short goodbye via `voice_speak`, then call `voice_stop` to shut the
+   background voice daemon down, and end the conversation -- don't call
    `voice_listen` again.
 6. If `voice_listen` returns `timed_out: true`, check in once via `voice_speak`
-   ("still there?" or similar); if it times out twice in a row, end the
-   conversation quietly without another prompt.
+   ("still there?" or similar); if it times out twice in a row, call
+   `voice_stop` and end the conversation quietly without another prompt.
 
-Keep every `voice_speak` call short and casual throughout. Passive spoken
-narration also happens automatically after each turn and after subagents
-finish via hooks, independent of this conversation.
+Keep every `voice_speak` call short and casual throughout. `voice_stop` should
+only be called once, at the very end of the conversation -- never between
+turns.
