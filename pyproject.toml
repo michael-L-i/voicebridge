@@ -38,6 +38,7 @@ dependencies = [
 [project.scripts]
 voicebridge = "voicebridge.cli:main"
 voicebridge-mcp = "voicebridge.mcp.server:main"
+voicebridge-daemon = "voicebridge.daemon.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -2,6 +2,7 @@ import os
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 from voicebridge.config import CONFIG_PATH
 
@@ -30,12 +31,25 @@ def start_background() -> int:
     """Launch the daemon detached and record its pid. The sole entry point
     both the CLI and the MCP server's lazy auto-start use, so a SessionEnd
     hook (or voice_stop) can always find the daemon to shut it down,
-    regardless of which path started it."""
+    regardless of which path started it.
+
+    Launches the installed `voicebridge-daemon` console script rather than
+    `python -m voicebridge.daemon.server`: `-m` inserts the *current working
+    directory* at sys.path[0], and since this subprocess inherits whatever
+    cwd the caller (the MCP server, itself launched by Claude Code in the
+    user's project directory) happens to have, a project that contains its
+    own directory literally named `voicebridge` would shadow the real
+    installed package -- this actually happened during development. Running
+    the console script instead resolves sys.path from the venv, independent
+    of cwd. `cwd` is still pinned explicitly, as defense in depth.
+    """
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    daemon_bin = Path(sys.executable).parent / "voicebridge-daemon"
     proc = subprocess.Popen(
-        [sys.executable, "-m", "voicebridge.daemon.server"],
+        [str(daemon_bin)],
         stdout=open(LOG_FILE, "a"),
         stderr=subprocess.STDOUT,
+        cwd=str(PID_FILE.parent),
         start_new_session=True,
     )
     PID_FILE.write_text(str(proc.pid))
