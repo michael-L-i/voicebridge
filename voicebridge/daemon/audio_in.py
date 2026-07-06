@@ -1,3 +1,5 @@
+import threading
+
 import numpy as np
 import sounddevice as sd
 
@@ -20,6 +22,20 @@ _SETTLE_MS = 300
 _THRESHOLD_MULTIPLIER = 3.0
 _MIN_THRESHOLD = 0.008
 _MAX_THRESHOLD = 0.05
+# Extra time past max_listen_ms before the watchdog force-aborts the stream.
+# A single stream.read() call can block indefinitely -- observed in practice
+# when the Mac went to sleep mid-listen -- in which case the per-block loop
+# never even gets a chance to check max_blocks. Without this, that one
+# request holds audio_lock forever, wedging every future voice_speak and
+# voice_listen call, and the daemon becomes un-killable by a graceful
+# shutdown (SIGTERM waits for in-flight requests) -- observed running for
+# hours as a result.
+_WATCHDOG_GRACE_S = 5.0
+
+
+def _abort_if_still_open(stream: sd.InputStream) -> None:
+    if not stream.closed:
+        stream.abort()
 
 
 def listen(
@@ -28,7 +44,8 @@ def listen(
     """Record from the mic until silence_ms of quiet follows some speech, or
     max_listen_ms elapses. Returns (mono float32 PCM at sample_rate, timed_out)
     -- timed_out is True iff max_listen_ms was hit without a natural
-    speech-then-silence ending (including the "never said anything" case)."""
+    speech-then-silence ending (including the "never said anything" case, and
+    the watchdog-forced-abort case)."""
     block_samples = int(sample_rate * _BLOCK_MS / 1000)
     max_blocks = max(1, int(max_listen_ms / _BLOCK_MS))
     silence_blocks_needed = max(1, int(silence_ms / _BLOCK_MS))
@@ -43,7 +60,14 @@ def listen(
     # Shares the lock with playback: never record and speak at once, and a
     # narration mid-listen just waits its turn instead of talking over you.
     with audio_lock:
-        with sd.InputStream(samplerate=sample_rate, channels=1, dtype="float32") as stream:
+        stream = sd.InputStream(samplerate=sample_rate, channels=1, dtype="float32")
+        stream.start()
+        watchdog = threading.Timer(
+            (max_listen_ms / 1000) + _WATCHDOG_GRACE_S, _abort_if_still_open, args=(stream,)
+        )
+        watchdog.daemon = True
+        watchdog.start()
+        try:
             settle_rms = []
             for _ in range(settle_blocks):
                 block, _overflowed = stream.read(block_samples)
@@ -67,6 +91,15 @@ def listen(
                 if has_spoken and i >= min_blocks and consecutive_silence >= silence_blocks_needed:
                     timed_out = False
                     break
+        except sd.PortAudioError:
+            # The watchdog aborted the stream out from under us, or the
+            # device otherwise vanished mid-read. Fall through and return
+            # whatever was captured so far rather than crashing the request.
+            pass
+        finally:
+            watchdog.cancel()
+            if not stream.closed:
+                stream.close()
 
     audio = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
     return audio, timed_out

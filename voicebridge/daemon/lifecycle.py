@@ -2,12 +2,19 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from voicebridge.config import CONFIG_PATH
 
 PID_FILE = CONFIG_PATH.parent / "daemon.pid"
 LOG_FILE = CONFIG_PATH.parent / "daemon.log"
+# How long to wait for a graceful SIGTERM shutdown before escalating to
+# SIGKILL. A daemon wedged inside a blocking mic read (observed: stuck for
+# hours, immune to plain SIGTERM) would otherwise survive both voice_stop
+# and the SessionEnd hook forever, defeating the whole point of a
+# session-scoped daemon.
+_SIGTERM_GRACE_S = 3.0
 
 
 def pid_alive(pid: int) -> bool:
@@ -58,12 +65,25 @@ def start_background() -> int:
 
 def stop_background() -> bool:
     """Stop the daemon if it's running. Returns whether a live process was
-    actually signaled (as opposed to just clearing a stale pid file)."""
+    actually signaled (as opposed to just clearing a stale pid file).
+
+    Escalates to SIGKILL if the process is still alive after a short grace
+    period: a daemon wedged inside a blocking mic read (a real observed
+    failure mode -- a Mac going to sleep mid-listen can hang the underlying
+    read indefinitely) won't respond to SIGTERM at all, since uvicorn's
+    graceful shutdown waits for in-flight requests to finish first. Without
+    this escalation such a daemon survives forever, immune to both
+    voice_stop and the SessionEnd hook."""
     pid = read_pid()
     sent = False
     if pid is not None and pid_alive(pid):
         os.kill(pid, signal.SIGTERM)
         sent = True
+        deadline = time.time() + _SIGTERM_GRACE_S
+        while time.time() < deadline and pid_alive(pid):
+            time.sleep(0.2)
+        if pid_alive(pid):
+            os.kill(pid, signal.SIGKILL)
     if PID_FILE.exists():
         PID_FILE.unlink()
     return sent
