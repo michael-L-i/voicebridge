@@ -5,7 +5,7 @@
 # broken call at package import time instead; see that module for details.
 [project]
 name = "voicebridge"
-version = "0.1.3"
+version = "0.1.4"
 description = "Fully local voice companion for Claude Code (Apple Silicon / MLX)"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,6 +30,12 @@ dependencies = [
   "httpx>=0.27",
   "sounddevice>=0.5",
   "numpy>=1.26",
+  # Real frame-classifying voice activity detection (Google's WebRTC VAD),
+  # replacing a naive RMS energy threshold -- this is the single biggest
+  # factor in voicemode's listening feeling more reliable than an amplitude
+  # cutoff. "-wheels" is a maintained fork with importlib.metadata support
+  # (no pkg_resources dependency), matching what voicemode itself uses.
+  "webrtcvad-wheels>=2.0.14",
   "pydantic>=2.9",
   "mcp>=1.2",
   "click>=8.1",

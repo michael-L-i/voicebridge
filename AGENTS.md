@@ -68,9 +68,15 @@ This repo is both the plugin and its own marketplace (see
   (`start_background`/`stop_background`/`pid_alive`/`read_pid`), used by both
   `cli.py` and `mcp/server.py` so the `SessionEnd` hook can always find the
   daemon to kill it, regardless of which path started it.
-- `voicebridge/daemon/audio_in.py` / `audio_out.py`: mic capture with
-  energy-based VAD, and playback serialized through a shared lock (never
-  record and speak at the same instant -- there's no echo cancellation).
+- `voicebridge/daemon/audio_in.py` / `audio_out.py`: mic capture using a real
+  WebRTC voice-activity classifier (not an amplitude threshold -- ported from
+  studying voicemode's approach, a meaningfully more reliable
+  speech/silence signal across rooms and mics), callback-driven so a
+  device-level hang can never block the daemon (a blocking `stream.read()`
+  hung for hours in practice when the Mac slept mid-listen). Audible
+  start/end chimes mark exactly when the mic is listening. Playback and
+  capture are serialized through a shared lock (never record and speak at
+  the same instant -- there's no echo cancellation).
 - `voicebridge/daemon/summarizer.py`: MLX summarizer wrapper, the spoken-style
   compression prompt, and the `is_already_short` heuristic that skips
   compression on text that's already spoken-sized.
