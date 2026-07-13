@@ -1,7 +1,7 @@
 #!/bin/bash
-# Declared as this plugin's MCP server command in .mcp.json. Ensures a
+# Declared as this plugin's MCP server command in the plugin manifest. Ensures a
 # private venv with voicebridge + its local speech deps (mlx-audio, misaki,
-# spacy, ...) exists under CLAUDE_PLUGIN_DATA, building it on first
+# spacy, ...) exists under VOICEBRIDGE_DATA_DIR, building it on first
 # run (or after a plugin update changes pyproject.toml), then execs into the
 # real voicebridge-mcp entrypoint inside that venv.
 #
@@ -10,8 +10,8 @@
 # the final exec corrupts the protocol handshake Claude Code expects.
 set -euo pipefail
 
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}"
-DATA_DIR="${CLAUDE_PLUGIN_DATA}"
+PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+DATA_DIR="${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}"
 VENV_DIR="${DATA_DIR}/venv"
 MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
@@ -39,6 +39,10 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
          "(e.g. brew install python@3.12) and start a new session." >&2
     exit 1
   fi
+  # A symlinked interpreter (common with uv-managed Python) can make venv
+  # record the symlink directory as its runtime home and fail in ensurepip.
+  PYTHON_BIN=$("${PYTHON_BIN}" -c \
+    'import os, sys; print(os.path.realpath(sys.executable))')
 
   rm -rf "${VENV_DIR}"
   "${PYTHON_BIN}" -m venv "${VENV_DIR}"

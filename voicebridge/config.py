@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-# Under the Claude Code plugin, .mcp.json sets this to ${CLAUDE_PLUGIN_DATA}
+# Under the Claude Code plugin, the manifest sets this to ${CLAUDE_PLUGIN_DATA}.
 # (a persistent per-plugin data dir) so config and the active-session lock
 # live there instead of a path hardcoded to one machine. Falls back to
 # ~/.voicebridge for direct-Python development commands.
