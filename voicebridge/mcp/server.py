@@ -60,7 +60,7 @@ def voice_stop() -> dict:
 
 @mcp.tool()
 def voice_status() -> dict:
-    """Report whether this Claude Code session has local voice models loaded."""
+    """Report the MLX Audio backend and models loaded for this voice session."""
     return {"ok": True, **runtime.status()}
 
 

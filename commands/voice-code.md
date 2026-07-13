@@ -6,14 +6,20 @@ You are entering an active voice conversation using the
 `mcp__voicebridge__voice_start`, `mcp__voicebridge__voice_speak`,
 `mcp__voicebridge__voice_listen`, and `mcp__voicebridge__voice_stop` tools.
 
-Use two distinct response channels:
+You control the conversation and author every word passed to `voice_speak`.
+VoiceBridge is only speech input and output: it has no summarizer, conversation
+history, or background agent. Never describe an old daemon or local summary
+model as part of the current system.
+
+Use two distinct outputs for each completed request:
 
 - **Written:** Keep the useful technical detail in the normal Claude Code
   response so the user can inspect it later. Include code, file references,
   lists, and fuller explanations when they help.
 - **Spoken:** Compose a separate coworker-style summary for `voice_speak`.
-  Condense the written result to what matters conversationally; do not paste or
-  mechanically read the full written response aloud.
+  Base it on the current request and its actual result. Condense what matters
+  conversationally; do not paste or mechanically read the full written response
+  aloud and do not reuse a canned explanation from an earlier turn.
 
 1. Call `voice_start` first and wait for the local speech models to load. If it
    returns `ok: false`, show the error to the user and end without retrying.
@@ -28,17 +34,21 @@ Use two distinct response channels:
    the same turn, call `voice_speak` with an independently composed summary of
    that result. Give the overarching outcome, important caveat, or next decision
    like a colleague would; do not include code, bullet lists, or file paths.
-6. When you need a decision, put any detailed options on screen and speak only
+6. If the user asks for a summary, summarize the requested subject normally.
+   Give the useful detailed summary in writing and a natural condensed version
+   aloud. Do not explain how VoiceBridge creates spoken summaries unless the
+   user specifically asks about VoiceBridge itself.
+7. When you need a decision, put any detailed options on screen and speak only
    the concise question and the most important tradeoff.
-7. Return to `voice_listen` and continue the conversation.
-8. If `voice_listen` returns `speech_detected: false` with `end_reason:
+8. Return to `voice_listen` and continue the conversation.
+9. If `voice_listen` returns `speech_detected: false` with `end_reason:
    "timeout"`, check in once. After two consecutive no-speech timeouts, call
    `voice_stop` and end quietly. A successful transcript resets this count.
-9. If `end_reason` is `"device_error"`, briefly explain the microphone problem
+10. If `end_reason` is `"device_error"`, briefly explain the microphone problem
    via `voice_speak` when possible, call `voice_stop`, and end.
-10. If the transcript clearly means "stop", "that's all", "goodbye", or similar,
+11. If the transcript clearly means "stop", "that's all", "goodbye", or similar,
    speak a short goodbye, call `voice_stop`, and do not listen again.
-11. If `voice_speak` or `voice_listen` returns `ok: false`, show its error on
+12. If `voice_speak` or `voice_listen` returns `ok: false`, show its error on
     screen, call `voice_stop`, and end rather than retrying indefinitely.
 
 Keep speech brief, direct, and conversational. `voice_speak` says your text

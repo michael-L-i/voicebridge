@@ -7,6 +7,10 @@ Silicon. Its stdio MCP process owns local TTS and STT models directly while a
 voice conversation is active. There is no HTTP daemon or local summarization
 model; Claude Code provides the exact text sent to TTS.
 
+MLX is the speech inference backend, not a second reasoning layer. Kokoro TTS
+and Parakeet STT run through `mlx-audio`; VoiceBridge never imports or invokes
+`mlx-lm`, even though it is currently installed transitively by `mlx-audio`.
+
 There is no passive narration. The only user experience is `/voicebridge:voice-code`:
 
 - The user runs the slash command. Claude calls `voice_start`, which loads
@@ -52,7 +56,9 @@ This repo is both the plugin and its own marketplace (see
   development. The plugin path invokes the MCP bootstrap instead.
 - `voicebridge/config.py`: Pydantic config models. `CONFIG_DIR` reads the
   `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
-  manifest, falling back to `~/.voicebridge` for direct-Python dev).
+  manifest, falling back to `~/.voicebridge` for direct-Python dev). Existing
+  configs are migrated away from the retired `[daemon]` and `[summarizer]`
+  sections without replacing current voice or audio choices.
 - `config/default_config.toml`: default speech model and audio settings
   copied into the user's config directory on first run.
 - `voicebridge/audio/capture.py` / `playback.py`: mic capture using a real

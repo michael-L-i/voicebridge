@@ -5,6 +5,8 @@
 `voicebridge` gives Claude Code a fully local voice interface on Apple Silicon.
 The plugin's stdio MCP process owns Kokoro TTS and Parakeet STT directly for an
 active conversation; there is no HTTP daemon or local summarization model.
+Both speech models run through MLX Audio. MLX is not used to generate or
+rewrite Claude's response.
 
 There is one integration surface: `/voicebridge:voice-code`. It loops between
 speaking and listening through `voice_start`, `voice_speak`, `voice_listen`, and
@@ -24,7 +26,8 @@ and Git workflow. Claude-specific notes below override only when they conflict.
 - `commands/voice-code.md` drives the conversation. Claude acknowledges longer
   tasks briefly and performs the actual work silently. Detailed results remain
   visible in Claude Code, while `voice_speak` receives a separately composed,
-  concise result or question.
+  concise result or question based on the current task. Summary requests should
+  answer the requested subject, not explain the voice machinery.
 - `voice_stop` drops both model providers, clears the MLX cache, and releases the
   session lock. Process exit is the safety net, so no shutdown hook is needed.
 
