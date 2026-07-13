@@ -21,8 +21,9 @@ and Git workflow. Claude-specific notes below override only when they conflict.
 - `voice_start` acquires the machine-wide voice-session lock and loads TTS and
   STT. The first call may wait for model downloads; later turns reuse them.
 - `commands/voice-code.md` drives the conversation. Claude acknowledges longer
-  tasks briefly, performs the actual work silently, and speaks only a concise
-  result or question.
+  tasks briefly and performs the actual work silently. Detailed results remain
+  visible in Claude Code, while `voice_speak` receives a separately composed,
+  concise result or question.
 - `voice_stop` drops both model providers, clears the MLX cache, and releases the
   session lock. Process exit is the safety net, so no shutdown hook is needed.
 
