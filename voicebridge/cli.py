@@ -2,10 +2,8 @@ import shutil
 import time
 
 import click
-import httpx
 
 from voicebridge.config import CONFIG_PATH, ensure_config_exists, load_config
-from voicebridge.daemon import lifecycle
 
 MIN_FREE_GB_RECOMMENDED = 10
 
@@ -58,14 +56,6 @@ def doctor():
         click.echo(f"[fail] mlx-audio not available: {e}")
         ok = False
 
-    try:
-        import mlx_lm  # noqa: F401
-
-        click.echo("[ok]   mlx-lm importable")
-    except Exception as e:
-        click.echo(f"[fail] mlx-lm not available: {e}")
-        ok = False
-
     if shutil.which("espeak-ng") is None:
         click.echo(
             "[warn] espeak-ng not found — Kokoro TTS will skip out-of-dictionary "
@@ -79,7 +69,7 @@ def doctor():
     if free_gb < MIN_FREE_GB_RECOMMENDED:
         click.echo(
             f"[warn] only {free_gb:.1f}GB free on this volume — model downloads "
-            f"(summarizer + Kokoro + Parakeet) can total several GB"
+            f"(Kokoro + Parakeet) can total several GB"
         )
     else:
         click.echo(f"[ok]   disk space: {free_gb:.1f}GB free")
@@ -91,65 +81,14 @@ def doctor():
         raise SystemExit(1)
 
 
-@main.command()
-@click.option("--background", "-d", is_flag=True, help="Start detached and return immediately.")
-def start(background: bool):
-    """Start the voicebridge daemon (loads and warms the summarizer + TTS models)."""
-    pid = lifecycle.read_pid()
-    if pid is not None and lifecycle.pid_alive(pid):
-        click.echo(f"Daemon already running (pid {pid}).")
-        return
-
-    if not background:
-        from voicebridge.daemon.server import main as run_daemon
-
-        run_daemon()
-        return
-
-    pid = lifecycle.start_background()
-    click.echo(f"Started daemon in background (pid {pid}). Logs: {lifecycle.LOG_FILE}")
-
-
-@main.command()
-def stop():
-    """Stop a background voicebridge daemon started with `start --background`."""
-    pid = lifecycle.read_pid()
-    if pid is None:
-        click.echo("No pid file found — is the daemon running in the background?")
-        return
-    if lifecycle.stop_background():
-        click.echo(f"Sent SIGTERM to pid {pid}.")
-    else:
-        click.echo(f"pid {pid} was not running.")
-
-
-@main.command()
-def status():
-    """Check whether the daemon is running and report loaded models."""
-    cfg = load_config()
-    url = f"http://{cfg.daemon.host}:{cfg.daemon.port}/health"
-    try:
-        resp = httpx.get(url, timeout=5)
-        resp.raise_for_status()
-        data = resp.json()
-        click.echo(f"[ok] daemon reachable at {url}")
-        click.echo(f"     summarizer: {data['models']['summarizer']}")
-        click.echo(f"     tts:        {data['models']['tts']}")
-        click.echo(f"     stt:        {data['models']['stt']}")
-        click.echo(f"     uptime:     {data['uptime_s']:.0f}s")
-    except Exception as e:
-        click.echo(f"[fail] daemon not reachable at {url}: {e}")
-        raise SystemExit(1)
-
-
 @main.command(name="listen-test")
 @click.option("--silence-ms", default=None, type=int, help="Override stt.silence_ms from config.")
 @click.option("--max-listen-ms", default=None, type=int, help="Override stt.max_listen_ms from config.")
 def listen_test(silence_ms: int | None, max_listen_ms: int | None):
     """Record from the mic, transcribe with the configured STT provider, and
     print the result and latency -- for validating mic capture and STT
-    accuracy directly, without going through the daemon."""
-    from voicebridge.daemon.audio_in import listen
+    accuracy directly, without going through the MCP server."""
+    from voicebridge.audio.capture import listen
     from voicebridge.providers.registry import get_stt_provider
 
     cfg = load_config()

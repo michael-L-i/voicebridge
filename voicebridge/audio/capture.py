@@ -4,7 +4,7 @@ import numpy as np
 import sounddevice as sd
 import webrtcvad
 
-from voicebridge.daemon.audio_out import audio_lock, play_chime_end, play_chime_start
+from voicebridge.audio.playback import audio_lock, play_chime_end, play_chime_start
 
 # WebRTC VAD is a real frame classifier (trained on speech vs. non-speech),
 # not an amplitude cutoff -- this is the single biggest factor in making

@@ -1,12 +1,3 @@
-[daemon]
-host = "127.0.0.1"
-port = 8756
-
-[summarizer]
-model = "mlx-community/Qwen2.5-3B-Instruct-4bit"
-max_tokens = 80
-context_window_summaries = 3
-
 [tts]
 provider = "kokoro"
 model = "mlx-community/Kokoro-82M-bf16"

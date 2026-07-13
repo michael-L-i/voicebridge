@@ -1,15 +1,9 @@
-# NOTE: mlx-lm 0.31.3 crashes on import under transformers>=5 (an
-# AutoTokenizer.register API break), while mlx-audio 0.4.4 hard-requires
-# transformers>=5.5.0 -- the two packages' declared floors are mutually
-# exclusive, so no pin resolves both. voicebridge._compat patches the one
-# broken call at package import time instead; see that module for details.
 [project]
 name = "voicebridge"
 version = "0.1.4"
 description = "Fully local voice companion for Claude Code (Apple Silicon / MLX)"
 requires-python = ">=3.11"
 dependencies = [
-  "mlx-lm>=0.19",
   "mlx-audio>=0.4.4",
   # Kokoro's text frontend needs these, but mlx-audio doesn't declare them --
   # misaki[en]'s own extra pins an old spacy/thinc/blis chain that fails to
@@ -25,9 +19,6 @@ dependencies = [
   "num2words",
   "phonemizer-fork",
   "espeakng-loader",
-  "fastapi>=0.115",
-  "uvicorn>=0.32",
-  "httpx>=0.27",
   "sounddevice>=0.5",
   "numpy>=1.26",
   # Real frame-classifying voice activity detection (Google's WebRTC VAD),
@@ -44,7 +35,6 @@ dependencies = [
 [project.scripts]
 voicebridge = "voicebridge.cli:main"
 voicebridge-mcp = "voicebridge.mcp.server:main"
-voicebridge-daemon = "voicebridge.daemon.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]

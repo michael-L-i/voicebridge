@@ -14,17 +14,6 @@ CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"
 
 
-class DaemonConfig(BaseModel):
-    host: str = "127.0.0.1"
-    port: int = 8756
-
-
-class SummarizerConfig(BaseModel):
-    model: str = "mlx-community/Qwen2.5-3B-Instruct-4bit"
-    max_tokens: int = 80
-    context_window_summaries: int = 3
-
-
 class TTSConfig(BaseModel):
     provider: str = "kokoro"
     model: str = "mlx-community/Kokoro-82M-bf16"
@@ -45,8 +34,6 @@ class AudioConfig(BaseModel):
 
 
 class Config(BaseModel):
-    daemon: DaemonConfig = DaemonConfig()
-    summarizer: SummarizerConfig = SummarizerConfig()
     tts: TTSConfig = TTSConfig()
     stt: STTConfig = STTConfig()
     audio: AudioConfig = AudioConfig()
