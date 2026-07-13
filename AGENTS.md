@@ -3,27 +3,26 @@
 ## Project Overview
 
 `voicebridge` is a Claude Code plugin: a fully local voice companion for Apple
-Silicon. It runs a local FastAPI daemon that keeps speech, transcription, and
-summarization models warm, exposed to Claude only through an MCP server and a
-slash command.
+Silicon. Its stdio MCP process owns local TTS and STT models directly while a
+voice conversation is active. There is no HTTP daemon or local summarization
+model; Claude Code provides the exact text sent to TTS.
 
 There is no passive narration. The only user experience is `/voicebridge:voice-code`:
 
-- The user runs the slash command. Claude speaks a greeting via the
-  `voice_speak` MCP tool, which lazily starts the background daemon on first
-  use if it isn't already running.
+- The user runs the slash command. Claude calls `voice_start`, which loads
+  Kokoro and Parakeet in the MCP process, then speaks a greeting via
+  `voice_speak`.
 - Claude calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
 - Claude calls `voice_speak` again with a short spoken-style update, and the
   loop repeats until the user says something like "stop" or two consecutive
   `voice_listen` calls time out.
-- At that point Claude calls `voice_stop`, which shuts the daemon down and
-  frees the several GB of MLX models it holds in memory. A `SessionEnd` hook
-  is a safety net for the same shutdown if the session just ends instead
-  (closed terminal, `/clear`, etc.) without an explicit goodbye.
+- At that point Claude calls `voice_stop`, which drops both providers, clears
+  the MLX cache, and releases the active-session lock. If the Claude Code
+  session ends unexpectedly, MCP process exit releases its memory and lock.
 
-The daemon is deliberately session-scoped, not a 24/7 background service --
-it only exists while a voice conversation is actually happening.
+The MCP process itself is lightweight until voice mode starts. Models remain
+warm between turns, then are released when the conversation stops.
 
 The package is Python 3.11+ and is configured by `pyproject.toml`.
 
@@ -46,52 +45,37 @@ This repo is both the plugin and its own marketplace (see
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
-- `hooks/hooks.json` + `hooks/session_end.sh`: the `SessionEnd` safety-net
-  shutdown described above. Pure bash, no Python dependency, since it must
-  work even if the venv bootstrap never completed.
 - `commands/voice-code.md`: the `/voicebridge:voice-code` slash command
   (namespaced to the plugin name automatically by Claude Code).
 
 ## Important Paths
 
-- `voicebridge/cli.py`: Click CLI -- `doctor`, `start`, `stop`, `status`,
-  `listen-test`. Used for direct-Python development; the plugin path doesn't
-  invoke this directly (the MCP bootstrap wrapper starts the daemon itself).
+- `voicebridge/cli.py`: Click CLI with `doctor` and `listen-test` for direct
+  development. The plugin path invokes the MCP bootstrap instead.
 - `voicebridge/config.py`: Pydantic config models. `CONFIG_DIR` reads the
   `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by `.mcp.json`
   under the plugin, falling back to `~/.voicebridge` for direct-Python dev).
-- `config/default_config.toml`: default daemon, model, and audio settings
+- `config/default_config.toml`: default speech model and audio settings
   copied into the user's config directory on first run.
-- `voicebridge/daemon/server.py`: FastAPI daemon with `/health`, `/speak`, and
-  `/listen` routes only.
-- `voicebridge/daemon/lifecycle.py`: shared PID-file bookkeeping
-  (`start_background`/`stop_background`/`pid_alive`/`read_pid`), used by both
-  `cli.py` and `mcp/server.py` so the `SessionEnd` hook can always find the
-  daemon to kill it, regardless of which path started it.
-- `voicebridge/daemon/audio_in.py` / `audio_out.py`: mic capture using a real
+- `voicebridge/audio/capture.py` / `playback.py`: mic capture using a real
   WebRTC voice-activity classifier (not an amplitude threshold -- ported from
   studying voicemode's approach, a meaningfully more reliable
   speech/silence signal across rooms and mics), callback-driven so a
-  device-level hang can never block the daemon (a blocking `stream.read()`
+  device-level hang cannot block indefinitely (a blocking `stream.read()`
   hung for hours in practice when the Mac slept mid-listen). Audible
   start/end chimes mark exactly when the mic is listening. Playback and
   capture are serialized through a shared lock (never record and speak at
   the same instant -- there's no echo cancellation).
-- `voicebridge/daemon/summarizer.py`: MLX summarizer wrapper, the spoken-style
-  compression prompt, and the `is_already_short` heuristic that skips
-  compression on text that's already spoken-sized.
-- `voicebridge/daemon/state.py`: per-session spoken-summary history only
-  (`SessionState`), for conversational continuity within a `/voice-code`
-  session.
 - `voicebridge/providers/`: STT/TTS provider abstractions
   (`TTSProvider`/`STTProvider`) and a plain-dict registry keyed by config
   string. Concrete providers: `kokoro_tts.py` (default TTS), `parakeet_stt.py`
   (default STT), `whisper_stt.py` (alternate STT, proves the registry swap
   works via config alone).
-- `voicebridge/mcp/server.py`: the MCP tools -- `voice_speak`, `voice_listen`,
-  `voice_stop`, `voice_status`. Reads `CLAUDE_CODE_SESSION_ID` (set by Claude
-  Code on every process it spawns) to key session state without the agent
-  needing to pass it explicitly.
+- `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_start`,
+  `voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
+- `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
+  session lock. Only one Claude Code voice conversation can use the machine's
+  audio devices and model memory at a time.
 
 ## Local Commands
 
@@ -100,18 +84,14 @@ Run commands from the repository root.
 ```bash
 python -m pip install -e .
 voicebridge doctor
-voicebridge start
-voicebridge start --background
-voicebridge status
-voicebridge stop
 voicebridge listen-test
+python -m unittest discover -s tests -v
 ```
 
-There is no dedicated test suite in this repo yet. For behavioral changes, run
-the narrowest relevant manual check, usually `voicebridge doctor`,
-`voicebridge status`, `voicebridge listen-test`, or a direct
-`voice_speak`/`voice_listen`/`voice_stop` call through a real MCP client
-session.
+For behavioral changes, run the unit tests plus the narrowest relevant manual
+check, usually `voicebridge doctor`, `voicebridge listen-test`, or a direct
+`voice_start`/`voice_speak`/`voice_listen`/`voice_stop` sequence through a real
+MCP client session.
 
 ## Development Principles
 
@@ -123,13 +103,12 @@ session.
   network dependencies unless the user explicitly asks for them.
 - Keep audio playback and recording serialized through the existing audio
   lock.
-- Keep the daemon session-scoped. Don't reintroduce a 24/7 background service
-  or automatic passive narration -- both were deliberately removed.
-- Treat mic/model failures defensively -- a missing model, a dead daemon, or
-  a timed-out listen should surface as a clear result, not a crash.
-- Be careful with model loading paths. The daemon intentionally loads models
-  once at startup so `voice_speak`/`voice_listen` calls avoid model-load
-  latency mid-conversation.
+- Do not introduce a detached service, automatic passive narration, or a
+  second language model. They are deliberately outside the product.
+- Treat mic/model failures defensively. A missing model, device failure, or
+  timed-out listen should surface as a clear result, not a crash.
+- Keep heavy model imports out of MCP startup. `voice_start` intentionally
+  loads both speech models before the greeting so turns stay responsive.
 - Keep spoken output brief and natural. This project optimizes for audio, not
   screen-style reports.
 - Don't assume a dependency's currently-pinned transitive versions are
@@ -151,7 +130,7 @@ session.
 - Follow the current Python style: simple modules, typed function signatures
   where useful, and straightforward Pydantic models for structured config.
 - Keep comments sparse and useful. Explain non-obvious behavior, especially
-  around the daemon lifecycle, audio locking, sample rates, and model
+  around process/session locking, audio locking, sample rates, and model
   compatibility gotchas.
 - Avoid large rewrites when a focused patch solves the problem.
 - Keep markdown and code ASCII unless a file already uses another character

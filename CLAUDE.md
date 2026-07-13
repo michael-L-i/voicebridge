@@ -2,47 +2,36 @@
 
 ## Project Summary
 
-`voicebridge` gives Claude Code a local voice interface on Apple Silicon,
-distributed as a Claude Code plugin. It uses MLX-backed local models for
-summarization, TTS, and STT, plus a FastAPI daemon that stays warm for the
-duration of a voice conversation -- not a 24/7 background service.
+`voicebridge` gives Claude Code a fully local voice interface on Apple Silicon.
+The plugin's stdio MCP process owns Kokoro TTS and Parakeet STT directly for an
+active conversation; there is no HTTP daemon or local summarization model.
 
-There's one integration surface: an active `/voicebridge:voice-code` slash
-command that loops between speaking and listening through an MCP server
-(`voice_speak`, `voice_listen`, `voice_stop`, `voice_status`). There is no
-passive narration -- that was deliberately removed.
+There is one integration surface: `/voicebridge:voice-code`. It loops between
+speaking and listening through `voice_start`, `voice_speak`, `voice_listen`, and
+`voice_stop`. Claude Code supplies the exact text spoken by TTS. There is no
+passive narration.
 
-Read `AGENTS.md` for the shared project map, commands, development
-principles, and Git workflow. Claude-specific notes below override only when
-they conflict.
+Read `AGENTS.md` for the shared project map, commands, development principles,
+and Git workflow. Claude-specific notes below override only when they conflict.
 
 ## Claude-Specific Flow
 
-- Installed via Claude Code's plugin mechanism (`/plugin marketplace add`,
-  `/plugin install`) -- `.mcp.json` and `hooks/hooks.json` are auto-discovered
-  and wired up by Claude Code itself, no manual `claude mcp add` or
-  settings.json editing.
-- `commands/voice-code.md` drives the conversation: greet via `voice_speak`,
-  loop on `voice_listen`, act on the transcript with normal tools silently,
-  update via `voice_speak`, repeat.
-- The conversation ends either on a stop phrase ("stop"/"goodbye"/etc, after
-  which Claude calls `voice_stop`) or two consecutive `voice_listen` timeouts
-  (also followed by `voice_stop`). A `SessionEnd` hook (`hooks/session_end.sh`)
-  is the safety net if the session just ends without an explicit goodbye.
-- The daemon (`voicebridge/daemon/server.py`) holds the summarizer, TTS, and
-  STT models warm only while a conversation is active; `voice_speak`/
-  `voice_listen` lazily start it on first use via
-  `voicebridge/daemon/lifecycle.py`, which both the CLI and the MCP server
-  share so shutdown can always find it regardless of which path started it.
+- Claude Code installs and wires the plugin through its normal plugin mechanism;
+  `.mcp.json` starts the lightweight stdio MCP server without manual MCP setup.
+- `voice_start` acquires the machine-wide voice-session lock and loads TTS and
+  STT. The first call may wait for model downloads; later turns reuse them.
+- `commands/voice-code.md` drives the conversation. Claude acknowledges longer
+  tasks briefly, performs the actual work silently, and speaks only a concise
+  result or question.
+- `voice_stop` drops both model providers, clears the MLX cache, and releases the
+  session lock. Process exit is the safety net, so no shutdown hook is needed.
 
 ## Working Expectations
 
 - Keep changes concise and organized.
-- Make incremental commits for coherent work units when committing is part of
-  the task.
+- Make incremental commits for coherent work units when commits are requested.
 - Prefer small, reviewable patches over broad rewrites.
 - Verify with the narrowest relevant command after code changes.
-- Don't reintroduce passive narration or a 24/7 daemon -- both were
-  deliberately removed based on real usage.
-- Keep spoken text short, conversational, and free of code blocks, bullet
-  lists, and long file paths.
+- Do not add passive narration, a detached daemon, or a second language model.
+- Keep spoken text short, conversational, and free of code blocks, bullet lists,
+  and long file paths.
