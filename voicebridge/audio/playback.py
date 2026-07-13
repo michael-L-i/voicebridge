@@ -3,17 +3,14 @@ import threading
 import numpy as np
 import sounddevice as sd
 
-# One global lock covers both playback and mic capture -- narration,
-# voice_speak, and voice_listen all serialize through it. There's no real use
-# case for speaking and listening at the same instant with no echo
-# cancellation anyway, so this also solves "a SubagentStop narration fires
-# mid voice_speak" for free: it just queues instead of talking over anyone.
+# One global lock covers both TTS playback and mic capture. Without echo
+# cancellation, serializing them prevents VoiceBridge from hearing itself.
 audio_lock = threading.Lock()
 
 _CHIME_SAMPLE_RATE = 24000
 _CHIME_TONE_S = 0.1
 _CHIME_FADE_S = 0.01
-_CHIME_TRAILING_SILENCE_S = 0.15
+_CHIME_TRAILING_SILENCE_S = 0.05
 
 
 def _device_arg(device: str | int | None) -> str | int | None:

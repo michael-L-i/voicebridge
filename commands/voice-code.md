@@ -24,7 +24,8 @@ Use two distinct outputs for each completed request:
 1. Call `voice_start` first and wait for the local speech models to load. If it
    returns `ok: false`, show the error to the user and end without retrying.
 2. Once ready, call `voice_speak` with a brief, casual one-sentence greeting,
-   then call `voice_listen`.
+   then call `voice_listen` immediately after playback returns. Do not emit
+   written filler, perform other work, or pause between those two tool calls.
 3. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Act on it with your normal tools.
 4. For a request likely to take noticeable time, acknowledge it first with one

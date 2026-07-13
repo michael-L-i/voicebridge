@@ -15,7 +15,9 @@ _VAD_AGGRESSIVENESS = 3
 _CHUNK_MS = 30
 _MIN_SPEECH_MS = 500
 _PRE_ROLL_MS = 300
-_SETTLE_MS = 300
+# PortAudio still needs a brief stabilization window after opening the input,
+# but the start chime has already given the output device time to wake up.
+_SETTLE_MS = 100
 _SPEECH_START_CHUNKS = 2
 _QUEUE_POLL_S = 0.1
 
