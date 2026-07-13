@@ -1,6 +1,6 @@
 [project]
 name = "voicebridge"
-version = "0.2.2"
+version = "0.2.3"
 description = "Local Kokoro speech and Parakeet transcription for Claude Code on Apple Silicon"
 requires-python = ">=3.11"
 dependencies = [
