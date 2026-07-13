@@ -17,7 +17,8 @@ and Git workflow. Claude-specific notes below override only when they conflict.
 ## Claude-Specific Flow
 
 - Claude Code installs and wires the plugin through its normal plugin mechanism;
-  `.mcp.json` starts the lightweight stdio MCP server without manual MCP setup.
+  the plugin manifest starts the lightweight stdio MCP server without manual
+  MCP setup.
 - `voice_start` acquires the machine-wide voice-session lock and loads TTS and
   STT. The first call may wait for model downloads; later turns reuse them.
 - `commands/voice-code.md` drives the conversation. Claude acknowledges longer

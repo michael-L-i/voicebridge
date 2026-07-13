@@ -34,11 +34,9 @@ This repo is both the plugin and its own marketplace (see
 (`/plugin marketplace add` then `/plugin install`) -- there's no manual
 `claude mcp add` or hand-editing `~/.claude/settings.json` involved.
 
-- `.claude-plugin/plugin.json`: plugin manifest.
+- `.claude-plugin/plugin.json`: plugin manifest and MCP server declaration.
 - `.claude-plugin/marketplace.json`: lets this repo be added as its own
   marketplace.
-- `.mcp.json`: declares the MCP server. Claude Code auto-starts it whenever
-  the plugin is enabled; its `command` points at `bin/voicebridge-mcp-bootstrap`.
 - `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
   under `${CLAUDE_PLUGIN_DATA}/venv` on first run (or after a dependency
   change), then `exec`s into the real `voicebridge-mcp` entrypoint inside it.
@@ -53,8 +51,8 @@ This repo is both the plugin and its own marketplace (see
 - `voicebridge/cli.py`: Click CLI with `doctor` and `listen-test` for direct
   development. The plugin path invokes the MCP bootstrap instead.
 - `voicebridge/config.py`: Pydantic config models. `CONFIG_DIR` reads the
-  `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by `.mcp.json`
-  under the plugin, falling back to `~/.voicebridge` for direct-Python dev).
+  `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
+  manifest, falling back to `~/.voicebridge` for direct-Python dev).
 - `config/default_config.toml`: default speech model and audio settings
   copied into the user's config directory on first run.
 - `voicebridge/audio/capture.py` / `playback.py`: mic capture using a real
