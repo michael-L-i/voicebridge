@@ -2,7 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -80,6 +80,39 @@ class VoiceRuntimeTests(unittest.TestCase):
         play.assert_called_once()
         self.assertTrue(stopped["stopped"])
         self.assertFalse(runtime.ready)
+
+    def test_listen_uses_config_timing_unless_overridden(self):
+        tts = _FakeTTS()
+        stt = _FakeSTT()
+        registry = _fake_registry(tts, stt)
+        config = Config(stt={"silence_ms": 2000, "max_listen_ms": 30000})
+        capture_result = SimpleNamespace(
+            audio=np.zeros(0, dtype=np.float32),
+            speech_detected=False,
+            end_reason="timeout",
+            error=None,
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as data_dir,
+            patch.object(runtime_module, "CONFIG_DIR", Path(data_dir)),
+            patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+            patch(
+                "voicebridge.audio.capture.listen",
+                return_value=capture_result,
+            ) as listen,
+        ):
+            runtime = runtime_module.VoiceRuntime(config)
+            configured = runtime.listen()
+            overridden = runtime.listen(timeout_ms=12000, silence_ms=750)
+        runtime.stop()
+
+        self.assertEqual(configured["silence_ms"], 2000)
+        self.assertEqual(configured["timeout_ms"], 30000)
+        self.assertEqual(overridden["silence_ms"], 750)
+        self.assertEqual(overridden["timeout_ms"], 12000)
+        self.assertEqual(listen.call_args_list[0].kwargs["silence_ms"], 2000)
+        self.assertEqual(listen.call_args_list[1].kwargs["silence_ms"], 750)
 
     def test_second_runtime_cannot_take_an_active_session(self):
         first_registry = _fake_registry(_FakeTTS(), _FakeSTT())

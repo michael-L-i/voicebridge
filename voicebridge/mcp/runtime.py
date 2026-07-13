@@ -72,16 +72,26 @@ class VoiceRuntime:
                 "duration_ms": int((time.monotonic() - started_at) * 1000),
             }
 
-    def listen(self, timeout_ms: int, silence_ms: int) -> dict:
+    def listen(
+        self,
+        timeout_ms: int | None = None,
+        silence_ms: int | None = None,
+    ) -> dict:
         with self._operation_lock:
             self._ensure_started()
             from voicebridge.audio.capture import listen
 
+            effective_timeout_ms = (
+                timeout_ms if timeout_ms is not None else self.config.stt.max_listen_ms
+            )
+            effective_silence_ms = (
+                silence_ms if silence_ms is not None else self.config.stt.silence_ms
+            )
             started_at = time.monotonic()
             result = listen(
                 self._stt.sample_rate,
-                silence_ms=silence_ms,
-                max_listen_ms=timeout_ms,
+                silence_ms=effective_silence_ms,
+                max_listen_ms=effective_timeout_ms,
                 input_device=self.config.audio.input_device,
                 output_device=self.config.audio.output_device,
             )
@@ -100,6 +110,8 @@ class VoiceRuntime:
                 "speech_detected": result.speech_detected,
                 "end_reason": result.end_reason,
                 "error": result.error,
+                "silence_ms": effective_silence_ms,
+                "timeout_ms": effective_timeout_ms,
             }
 
     def stop(self) -> dict:

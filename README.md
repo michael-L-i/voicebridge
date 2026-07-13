@@ -70,6 +70,8 @@ The first run creates `config.toml` in Claude Code's persistent plugin data
 directory. The supported settings are:
 
 ```toml
+config_version = 2
+
 [tts]
 provider = "kokoro"
 model = "mlx-community/Kokoro-82M-bf16"
@@ -79,7 +81,7 @@ speed = 1.0
 [stt]
 provider = "parakeet"
 model = "mlx-community/parakeet-tdt-0.6b-v3"
-silence_ms = 800
+silence_ms = 2000
 max_listen_ms = 30000
 
 [audio]

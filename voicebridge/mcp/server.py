@@ -37,10 +37,14 @@ def voice_speak(text: str, voice: str | None = None) -> dict:
 
 
 @mcp.tool()
-def voice_listen(timeout_ms: int = 30000, silence_ms: int = 800) -> dict:
+def voice_listen(
+    timeout_ms: int | None = None,
+    silence_ms: int | None = None,
+) -> dict:
     """Listen via microphone and return the user's transcribed instruction.
 
-    Capture ends after the user pauses or timeout_ms elapses. Check
+    Capture ends after the configured pause (two seconds by default) or overall
+    timeout. Optional arguments override config for one call. Check
     speech_detected and end_reason; a timeout may still contain valid speech.
     Playback and recording are serialized because there is no echo cancellation."""
     try:

@@ -16,6 +16,12 @@ CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"
 _SECTION_HEADER = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
 _LEGACY_SECTIONS = {"daemon", "summarizer"}
+_CURRENT_CONFIG_VERSION = 2
+_OLD_DEFAULT_SILENCE_MS = 800
+_DEFAULT_SILENCE_MS = 2000
+_SILENCE_SETTING = re.compile(
+    rf"^(\s*silence_ms\s*=\s*){_OLD_DEFAULT_SILENCE_MS}(\s*(?:#.*)?)$"
+)
 
 
 class TTSConfig(BaseModel):
@@ -28,7 +34,7 @@ class TTSConfig(BaseModel):
 class STTConfig(BaseModel):
     provider: str = "parakeet"
     model: str = "mlx-community/parakeet-tdt-0.6b-v3"
-    silence_ms: int = 800
+    silence_ms: int = _DEFAULT_SILENCE_MS
     max_listen_ms: int = 30000
 
 
@@ -38,6 +44,7 @@ class AudioConfig(BaseModel):
 
 
 class Config(BaseModel):
+    config_version: int = _CURRENT_CONFIG_VERSION
     tts: TTSConfig = TTSConfig()
     stt: STTConfig = STTConfig()
     audio: AudioConfig = AudioConfig()
@@ -48,24 +55,43 @@ def ensure_config_exists() -> Path:
     if not CONFIG_PATH.exists():
         shutil.copy(DEFAULT_CONFIG_PATH, CONFIG_PATH)
     else:
-        _remove_legacy_sections(CONFIG_PATH)
+        _migrate_config(CONFIG_PATH)
     return CONFIG_PATH
 
 
-def _remove_legacy_sections(path: Path) -> None:
-    """Remove settings from the retired daemon and Qwen summarizer."""
+def _migrate_config(path: Path) -> None:
+    """Migrate old defaults and remove retired runtime settings."""
     original = path.read_text(encoding="utf-8")
+    parsed = tomllib.loads(original)
+    version = int(parsed.get("config_version", 1))
     kept_lines = []
     in_legacy_section = False
+    current_section = None
 
     for line in original.splitlines(keepends=True):
-        header = _SECTION_HEADER.match(line.rstrip("\r\n"))
+        newline = (
+            "\r\n"
+            if line.endswith("\r\n")
+            else "\n"
+            if line.endswith("\n")
+            else ""
+        )
+        content = line[: -len(newline)] if newline else line
+        header = _SECTION_HEADER.match(content)
         if header:
-            in_legacy_section = header.group(1).strip() in _LEGACY_SECTIONS
+            current_section = header.group(1).strip()
+            in_legacy_section = current_section in _LEGACY_SECTIONS
+        elif version < 2 and current_section == "stt":
+            content = _SILENCE_SETTING.sub(
+                rf"\g<1>{_DEFAULT_SILENCE_MS}\g<2>", content
+            )
+            line = content + newline
         if not in_legacy_section:
             kept_lines.append(line)
 
     cleaned = "".join(kept_lines).lstrip("\r\n")
+    if version < _CURRENT_CONFIG_VERSION:
+        cleaned = f"config_version = {_CURRENT_CONFIG_VERSION}\n\n{cleaned}"
     if cleaned == original:
         return
 
