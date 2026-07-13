@@ -20,6 +20,7 @@ _PRE_ROLL_MS = 300
 _SETTLE_MS = 100
 _SPEECH_START_CHUNKS = 2
 _QUEUE_POLL_S = 0.1
+_DEVICE_STALL_S = 2.0
 
 _DEVICE_ERROR_MARKERS = (
     "device unavailable",
@@ -58,11 +59,11 @@ def listen(
     input_device: str | int | None = None,
     output_device: str | int | None = None,
 ) -> ListenResult:
-    """Capture one utterance with a bounded wall-clock deadline.
+    """Capture one utterance with silence endpointing and a rolling deadline.
 
     The returned end reason distinguishes a natural pause, the overall
-    deadline, and an audio-device failure. Valid speech is retained even when
-    the deadline expires, so callers can still transcribe a long utterance.
+    no-speech deadline, and an audio-device failure. The deadline is refreshed
+    whenever speech is detected so it cannot cut off someone who is talking.
     """
     if sample_rate <= 0:
         raise ValueError("sample_rate must be positive")
@@ -125,16 +126,21 @@ def listen(
                     settled_chunks += 1
 
                 deadline = time.monotonic() + (max_listen_ms / 1000)
+                last_audio_at = time.monotonic()
                 while end_reason != "device_error" and time.monotonic() < deadline:
                     remaining = deadline - time.monotonic()
                     try:
                         item = audio_queue.get(timeout=min(_QUEUE_POLL_S, remaining))
                     except queue.Empty:
+                        if time.monotonic() - last_audio_at >= _DEVICE_STALL_S:
+                            end_reason = "device_error"
+                            error = "audio input stopped delivering data"
                         continue
                     if isinstance(item, _DeviceError):
                         end_reason = "device_error"
                         error = item.message
                         break
+                    last_audio_at = time.monotonic()
 
                     pcm16 = (np.clip(item, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
                     try:
@@ -143,6 +149,9 @@ def listen(
                         # Preserve audio on a classifier hiccup instead of
                         # silently dropping something the user may have said.
                         is_speech = True
+
+                    if is_speech:
+                        deadline = time.monotonic() + (max_listen_ms / 1000)
 
                     if not speech_detected:
                         pre_roll.append(item)
