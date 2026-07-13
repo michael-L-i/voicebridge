@@ -79,7 +79,9 @@ This repo is both the plugin and its own marketplace (see
   `voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
 - `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
   session lock. Only one Claude Code voice conversation can use the machine's
-  audio devices and model memory at a time.
+  audio devices and model memory at a time. Status includes the running package
+  version and effective capture timing so stale post-update MCP processes are
+  visible instead of silently using old endpointing behavior.
 
 ## Local Commands
 

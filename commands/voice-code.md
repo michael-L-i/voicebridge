@@ -22,7 +22,11 @@ Use two distinct outputs for each completed request:
   aloud and do not reuse a canned explanation from an earlier turn.
 
 1. Call `voice_start` first and wait for the local speech models to load. If it
-   returns `ok: false`, show the error to the user and end without retrying.
+   returns `ok: false`, show the error to the user and end without retrying. A
+   current runtime also returns `version` and `capture`. If either field is
+   absent, the MCP process survived a plugin update and is stale: call
+   `voice_stop`, tell the user to fully exit every Claude Code session using
+   VoiceBridge and relaunch Claude Code, then end without starting a voice loop.
 2. Once ready, call `voice_speak` with a brief, casual one-sentence greeting,
    then call `voice_listen` immediately after playback returns. Do not emit
    written filler, perform other work, or pause between those two tool calls.

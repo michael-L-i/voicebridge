@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from voicebridge import __version__
 from voicebridge.config import CONFIG_DIR, Config, load_config
 
 
@@ -122,9 +123,14 @@ class VoiceRuntime:
 
     def status(self, *, already_ready: bool = False) -> dict:
         return {
+            "version": __version__,
             "ready": self.ready,
             "already_ready": already_ready,
             "backend": "mlx-audio",
+            "capture": {
+                "silence_ms": self.config.stt.silence_ms,
+                "timeout_ms": self.config.stt.max_listen_ms,
+            },
             "models": {
                 "tts": self.config.tts.model if self._tts is not None else None,
                 "stt": self.config.stt.model if self._stt is not None else None,

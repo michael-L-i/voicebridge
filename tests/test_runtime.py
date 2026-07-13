@@ -71,7 +71,10 @@ class VoiceRuntimeTests(unittest.TestCase):
             stopped = runtime.stop()
 
         self.assertTrue(first_start["ready"])
+        self.assertRegex(first_start["version"], r"^(?:\d+\.\d+\.\d+|development)$")
         self.assertEqual(first_start["backend"], "mlx-audio")
+        self.assertEqual(first_start["capture"]["silence_ms"], 2000)
+        self.assertEqual(first_start["capture"]["timeout_ms"], 30000)
         self.assertTrue(second_start["already_ready"])
         self.assertEqual(tts.load_count, 1)
         self.assertEqual(stt.load_count, 1)

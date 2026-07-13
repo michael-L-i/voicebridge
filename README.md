@@ -62,7 +62,10 @@ To update an installed release:
 /plugin update voicebridge@voicebridge-marketplace
 ```
 
-Then fully exit and restart Claude Code.
+Then fully exit every running Claude Code session that loaded VoiceBridge and
+restart Claude Code. Updating the marketplace changes the installed files but
+cannot replace an MCP process that is already running; `voice_start` reports the
+runtime version and capture settings so stale sessions are detected explicitly.
 
 ## Configuration
 
@@ -106,3 +109,6 @@ python -m unittest discover -s tests -v
 The plugin MCP tools are `voice_start`, `voice_speak`, `voice_listen`,
 `voice_stop`, and `voice_status`. `voice_speak` always plays the exact text
 Claude Code supplies; it never rewrites or summarizes that text locally.
+`voice_status` reports the running package version and effective endpointing
+settings, which is useful for confirming an update actually restarted the MCP
+process.
