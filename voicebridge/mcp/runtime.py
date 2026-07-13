@@ -112,6 +112,7 @@ class VoiceRuntime:
         return {
             "ready": self.ready,
             "already_ready": already_ready,
+            "backend": "mlx-audio",
             "models": {
                 "tts": self.config.tts.model if self._tts is not None else None,
                 "stt": self.config.stt.model if self._stt is not None else None,

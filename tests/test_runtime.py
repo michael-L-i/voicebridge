@@ -71,6 +71,7 @@ class VoiceRuntimeTests(unittest.TestCase):
             stopped = runtime.stop()
 
         self.assertTrue(first_start["ready"])
+        self.assertEqual(first_start["backend"], "mlx-audio")
         self.assertTrue(second_start["already_ready"])
         self.assertEqual(tts.load_count, 1)
         self.assertEqual(stt.load_count, 1)
