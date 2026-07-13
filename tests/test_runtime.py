@@ -57,13 +57,17 @@ class VoiceRuntimeTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as data_dir,
             patch.object(runtime_module, "CONFIG_DIR", Path(data_dir)),
-            patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
-            patch("voicebridge.audio.playback.play") as play,
         ):
             runtime = runtime_module.VoiceRuntime(Config())
-            first_start = runtime.start()
-            second_start = runtime.start()
-            spoken = runtime.speak("  Exactly this sentence.  ")
+            with (
+                patch.dict(
+                    sys.modules, {"voicebridge.providers.registry": registry}
+                ),
+                patch("voicebridge.audio.playback.play") as play,
+            ):
+                first_start = runtime.start()
+                second_start = runtime.start()
+                spoken = runtime.speak("  Exactly this sentence.  ")
             stopped = runtime.stop()
 
         self.assertTrue(first_start["ready"])
