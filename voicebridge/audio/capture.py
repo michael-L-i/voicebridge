@@ -1,4 +1,8 @@
 import queue
+import time
+from collections import deque
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import sounddevice as sd
@@ -6,23 +10,14 @@ import webrtcvad
 
 from voicebridge.audio.playback import audio_lock, play_chime_end, play_chime_start
 
-# WebRTC VAD is a real frame classifier (trained on speech vs. non-speech),
-# not an amplitude cutoff -- this is the single biggest factor in making
-# listening feel reliable across different rooms/mics, ported from
-# voicemode's approach after comparing against our original RMS-threshold
-# implementation. 0-3, higher = stricter about filtering non-speech;
-# 3 (voicemode's own default) works well for a normal room/office.
+# WebRTC VAD only accepts exactly 10, 20, or 30 ms frames.
 _VAD_AGGRESSIVENESS = 3
-# WebRTC VAD only accepts exactly 10, 20, or 30ms frames.
 _CHUNK_MS = 30
-_MIN_LISTEN_MS = 500
-# Read and discard this much audio right after opening the mic stream, before
-# any VAD evaluation starts. Covers two things at once: audio device startup
-# transients, and any tail-end echo/reverb still trailing in the room from
-# voice_speak's just-finished playback -- sd.play(blocking=True) can return
-# slightly before the sound has actually finished decaying acoustically, and
-# without this settle window that tail gets misread as the user talking.
+_MIN_SPEECH_MS = 500
+_PRE_ROLL_MS = 300
 _SETTLE_MS = 300
+_SPEECH_START_CHUNKS = 2
+_QUEUE_POLL_S = 0.1
 
 _DEVICE_ERROR_MARKERS = (
     "device unavailable",
@@ -33,101 +28,153 @@ _DEVICE_ERROR_MARKERS = (
     "portaudio error",
 )
 
+EndReason = Literal["silence", "timeout", "device_error"]
+
+
+@dataclass(frozen=True)
+class ListenResult:
+    audio: np.ndarray
+    speech_detected: bool
+    end_reason: EndReason
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class _DeviceError:
+    message: str
+
+
+def _device_arg(device: str | int | None) -> str | int | None:
+    return None if device in (None, "default") else device
+
 
 def listen(
-    sample_rate: int, silence_ms: int = 800, max_listen_ms: int = 30000
-) -> tuple[np.ndarray, bool]:
-    """Record from the mic until silence_ms of quiet follows some speech, or
-    max_listen_ms elapses. Returns (mono float32 PCM at sample_rate, timed_out)
-    -- timed_out is True iff max_listen_ms was hit without a natural
-    speech-then-silence ending (including "never said anything" and a
-    detected device error).
+    sample_rate: int,
+    silence_ms: int = 800,
+    max_listen_ms: int = 30000,
+    *,
+    input_device: str | int | None = None,
+    output_device: str | int | None = None,
+) -> ListenResult:
+    """Capture one utterance with a bounded wall-clock deadline.
 
-    Uses a callback-driven stream + queue rather than blocking stream.read():
-    a blocking read can hang indefinitely on a device-level hiccup (observed
-    in practice -- the Mac going to sleep mid-listen left a read call stuck
-    for hours, wedging the whole daemon since nothing else could acquire
-    audio_lock). Every queue.get() below is timeout-bounded, so this loop can
-    never block longer than that timeout no matter what the hardware does.
+    The returned end reason distinguishes a natural pause, the overall
+    deadline, and an audio-device failure. Valid speech is retained even when
+    the deadline expires, so callers can still transcribe a long utterance.
     """
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be positive")
+    if silence_ms <= 0:
+        raise ValueError("silence_ms must be positive")
+    if max_listen_ms <= 0:
+        raise ValueError("max_listen_ms must be positive")
+
     chunk_samples = int(sample_rate * _CHUNK_MS / 1000)
-    settle_chunks = max(1, int(_SETTLE_MS / _CHUNK_MS))
-    min_chunks = max(1, int(_MIN_LISTEN_MS / _CHUNK_MS))
-    silence_chunks_needed = max(1, int(silence_ms / _CHUNK_MS))
-    max_chunks = max(1, int(max_listen_ms / _CHUNK_MS))
+    settle_chunks = max(1, round(_SETTLE_MS / _CHUNK_MS))
+    min_speech_chunks = max(1, round(_MIN_SPEECH_MS / _CHUNK_MS))
+    pre_roll_chunks = max(1, round(_PRE_ROLL_MS / _CHUNK_MS))
+    silence_chunks_needed = max(1, round(silence_ms / _CHUNK_MS))
 
     vad = webrtcvad.Vad(_VAD_AGGRESSIVENESS)
-    audio_queue: queue.Queue = queue.Queue()
+    audio_queue: queue.Queue[np.ndarray | _DeviceError] = queue.Queue()
 
     def callback(indata, frames, time_info, status):
         if status:
-            status_str = str(status).lower()
-            if any(marker in status_str for marker in _DEVICE_ERROR_MARKERS):
-                audio_queue.put(None)  # sentinel: treat as a hard device error
+            status_text = str(status)
+            if any(marker in status_text.lower() for marker in _DEVICE_ERROR_MARKERS):
+                audio_queue.put(_DeviceError(status_text))
                 return
         audio_queue.put(indata[:, 0].copy())
 
-    chunks = []
+    chunks: list[np.ndarray] = []
+    pre_roll: deque[np.ndarray] = deque(maxlen=pre_roll_chunks)
+    speech_detected = False
+    consecutive_speech = 0
     consecutive_silence = 0
-    has_spoken = False
-    timed_out = True
+    captured_after_start = 0
+    end_reason: EndReason = "timeout"
+    error = None
 
     with audio_lock:
-        play_chime_start()
-        with sd.InputStream(
-            samplerate=sample_rate,
-            channels=1,
-            dtype="float32",
-            blocksize=chunk_samples,
-            callback=callback,
-        ):
-            device_error = False
-
-            for _ in range(settle_chunks):
-                try:
-                    block = audio_queue.get(timeout=1.0)
-                except queue.Empty:
-                    continue
-                if block is None:
-                    device_error = True
-                    break
-
-            if not device_error:
-                for i in range(max_chunks):
+        chime_started = False
+        try:
+            play_chime_start(output_device)
+            chime_started = True
+            with sd.InputStream(
+                samplerate=sample_rate,
+                channels=1,
+                dtype="float32",
+                blocksize=chunk_samples,
+                callback=callback,
+                device=_device_arg(input_device),
+            ):
+                settled_chunks = 0
+                settle_deadline = time.monotonic() + (_SETTLE_MS / 1000)
+                while settled_chunks < settle_chunks and time.monotonic() < settle_deadline:
+                    remaining = settle_deadline - time.monotonic()
                     try:
-                        block = audio_queue.get(timeout=1.0)
+                        item = audio_queue.get(timeout=min(_QUEUE_POLL_S, remaining))
                     except queue.Empty:
                         continue
-                    if block is None:
+                    if isinstance(item, _DeviceError):
+                        end_reason = "device_error"
+                        error = item.message
+                        break
+                    settled_chunks += 1
+
+                deadline = time.monotonic() + (max_listen_ms / 1000)
+                while end_reason != "device_error" and time.monotonic() < deadline:
+                    remaining = deadline - time.monotonic()
+                    try:
+                        item = audio_queue.get(timeout=min(_QUEUE_POLL_S, remaining))
+                    except queue.Empty:
+                        continue
+                    if isinstance(item, _DeviceError):
+                        end_reason = "device_error"
+                        error = item.message
                         break
 
-                    chunks.append(block)
-                    pcm16 = (np.clip(block, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+                    pcm16 = (np.clip(item, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
                     try:
                         is_speech = vad.is_speech(pcm16, sample_rate)
                     except Exception:
-                        # Matches voicemode: treat a VAD hiccup as speech
-                        # rather than silently discarding what was said.
+                        # Preserve audio on a classifier hiccup instead of
+                        # silently dropping something the user may have said.
                         is_speech = True
 
-                    if not has_spoken:
-                        if is_speech:
-                            has_spoken = True
-                            consecutive_silence = 0
-                        # No timeout while waiting for speech to start --
-                        # only max_chunks bounds this state, so a user
-                        # gathering their thoughts before speaking doesn't
-                        # get cut off.
-                    else:
-                        if is_speech:
-                            consecutive_silence = 0
-                        else:
-                            consecutive_silence += 1
-                        if i >= min_chunks and consecutive_silence >= silence_chunks_needed:
-                            timed_out = False
-                            break
+                    if not speech_detected:
+                        pre_roll.append(item)
+                        consecutive_speech = consecutive_speech + 1 if is_speech else 0
+                        if consecutive_speech >= _SPEECH_START_CHUNKS:
+                            speech_detected = True
+                            chunks.extend(pre_roll)
+                            pre_roll.clear()
+                        continue
 
-        play_chime_end()
+                    chunks.append(item)
+                    captured_after_start += 1
+                    consecutive_silence = 0 if is_speech else consecutive_silence + 1
+                    if (
+                        captured_after_start >= min_speech_chunks
+                        and consecutive_silence >= silence_chunks_needed
+                    ):
+                        end_reason = "silence"
+                        break
+        except Exception as exc:
+            end_reason = "device_error"
+            error = str(exc)
+        finally:
+            if chime_started:
+                try:
+                    play_chime_end(output_device)
+                except Exception as exc:
+                    end_reason = "device_error"
+                    error = error or str(exc)
 
     audio = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
-    return audio, timed_out
+    return ListenResult(
+        audio=audio,
+        speech_detected=speech_detected,
+        end_reason=end_reason,
+        error=error,
+    )

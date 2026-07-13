@@ -29,8 +29,8 @@ class STTConfig(BaseModel):
 
 
 class AudioConfig(BaseModel):
-    input_device: str = "default"
-    output_device: str = "default"
+    input_device: str | int = "default"
+    output_device: str | int = "default"
 
 
 class Config(BaseModel):

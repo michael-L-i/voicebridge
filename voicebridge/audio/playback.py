@@ -16,22 +16,31 @@ _CHIME_FADE_S = 0.01
 _CHIME_TRAILING_SILENCE_S = 0.15
 
 
-def play(audio: np.ndarray, sample_rate: int) -> None:
+def _device_arg(device: str | int | None) -> str | int | None:
+    return None if device in (None, "default") else device
+
+
+def play(
+    audio: np.ndarray, sample_rate: int, device: str | int | None = None
+) -> None:
     if audio.size == 0:
         return
     with audio_lock:
-        sd.play(audio, samplerate=sample_rate, blocking=True)
+        sd.play(
+            audio,
+            samplerate=sample_rate,
+            blocking=True,
+            device=_device_arg(device),
+        )
 
 
-def _chime_amplitude() -> float:
+def _chime_amplitude(device: str | int | None) -> float:
     """Quieter on built-in speakers, louder on Bluetooth -- ported from
     voicemode, which found Bluetooth output otherwise clips/misses the start
     of quiet sounds while the link wakes up."""
     try:
-        default_output = sd.default.device[1]
-        if default_output is None:
-            return 0.075
-        name = sd.query_devices()[default_output]["name"].lower()
+        info = sd.query_devices(_device_arg(device), "output")
+        name = info["name"].lower()
         if "airpod" in name or "bluetooth" in name:
             return 0.15
         return 0.075
@@ -39,8 +48,10 @@ def _chime_amplitude() -> float:
         return 0.075
 
 
-def _generate_chime(frequencies: list[float]) -> np.ndarray:
-    amplitude = _chime_amplitude()
+def _generate_chime(
+    frequencies: list[float], device: str | int | None
+) -> np.ndarray:
+    amplitude = _chime_amplitude(device)
     tone_samples = int(_CHIME_SAMPLE_RATE * _CHIME_TONE_S)
     fade_samples = int(_CHIME_SAMPLE_RATE * _CHIME_FADE_S)
     fade_in = np.linspace(0, 1, fade_samples)
@@ -65,16 +76,22 @@ def _generate_chime(frequencies: list[float]) -> np.ndarray:
 # part of why a voice interface stops feeling like a live conversation.
 # Ascending tones for "now listening", descending for "done listening",
 # matching the convention voicemode uses.
-_CHIME_START = _generate_chime([800, 1000])
-_CHIME_END = _generate_chime([1000, 800])
-
-
-def play_chime_start() -> None:
+def play_chime_start(device: str | int | None = None) -> None:
     """Caller must already hold audio_lock -- this doesn't acquire it, so it
     can be sequenced immediately before mic capture within one lock hold."""
-    sd.play(_CHIME_START, samplerate=_CHIME_SAMPLE_RATE, blocking=True)
+    sd.play(
+        _generate_chime([800, 1000], device),
+        samplerate=_CHIME_SAMPLE_RATE,
+        blocking=True,
+        device=_device_arg(device),
+    )
 
 
-def play_chime_end() -> None:
+def play_chime_end(device: str | int | None = None) -> None:
     """Caller must already hold audio_lock."""
-    sd.play(_CHIME_END, samplerate=_CHIME_SAMPLE_RATE, blocking=True)
+    sd.play(
+        _generate_chime([1000, 800], device),
+        samplerate=_CHIME_SAMPLE_RATE,
+        blocking=True,
+        device=_device_arg(device),
+    )

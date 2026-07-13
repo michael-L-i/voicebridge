@@ -98,24 +98,30 @@ def listen_test(silence_ms: int | None, max_listen_ms: int | None):
     click.echo("Listening... speak now.")
 
     t0 = time.time()
-    audio, timed_out = listen(
+    result = listen(
         provider.sample_rate,
         silence_ms=silence_ms or cfg.stt.silence_ms,
         max_listen_ms=max_listen_ms or cfg.stt.max_listen_ms,
+        input_device=cfg.audio.input_device,
+        output_device=cfg.audio.output_device,
     )
     record_dt = time.time() - t0
 
-    if timed_out:
-        click.echo(f"Timed out after {record_dt:.1f}s without detecting speech-then-silence.")
-    if audio.size == 0:
+    click.echo(f"Capture ended: {result.end_reason}")
+    if result.error:
+        click.echo(f"Audio error: {result.error}")
+    if not result.speech_detected or result.audio.size == 0:
         click.echo("No audio captured.")
         return
 
     t0 = time.time()
-    transcript = provider.transcribe(audio)
+    transcript = provider.transcribe(result.audio)
     transcribe_dt = time.time() - t0
 
-    click.echo(f"\nRecorded {audio.size / provider.sample_rate:.2f}s in {record_dt:.2f}s")
+    click.echo(
+        f"\nRecorded {result.audio.size / provider.sample_rate:.2f}s "
+        f"in {record_dt:.2f}s"
+    )
     click.echo(f"Transcribed in {transcribe_dt:.2f}s")
     click.echo(f"\nTranscript: {transcript!r}")
 

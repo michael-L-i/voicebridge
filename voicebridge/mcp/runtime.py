@@ -62,7 +62,11 @@ class VoiceRuntime:
 
             started_at = time.monotonic()
             audio = self._tts.synthesize(spoken_text, voice=voice)
-            play(audio, self._tts.sample_rate)
+            play(
+                audio,
+                self._tts.sample_rate,
+                device=self.config.audio.output_device,
+            )
             return {
                 "spoken_text": spoken_text,
                 "duration_ms": int((time.monotonic() - started_at) * 1000),
@@ -74,16 +78,28 @@ class VoiceRuntime:
             from voicebridge.audio.capture import listen
 
             started_at = time.monotonic()
-            audio, timed_out = listen(
+            result = listen(
                 self._stt.sample_rate,
                 silence_ms=silence_ms,
                 max_listen_ms=timeout_ms,
+                input_device=self.config.audio.input_device,
+                output_device=self.config.audio.output_device,
             )
-            transcript = self._stt.transcribe(audio) if audio.size > 0 else ""
+            transcription_started_at = time.monotonic()
+            transcript = (
+                self._stt.transcribe(result.audio)
+                if result.speech_detected and result.audio.size > 0
+                else ""
+            )
             return {
                 "transcript": transcript,
                 "duration_ms": int((time.monotonic() - started_at) * 1000),
-                "timed_out": timed_out,
+                "transcription_ms": int(
+                    (time.monotonic() - transcription_started_at) * 1000
+                ),
+                "speech_detected": result.speech_detected,
+                "end_reason": result.end_reason,
+                "error": result.error,
             }
 
     def stop(self) -> dict:

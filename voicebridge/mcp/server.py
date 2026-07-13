@@ -40,8 +40,9 @@ def voice_speak(text: str, voice: str | None = None) -> dict:
 def voice_listen(timeout_ms: int = 30000, silence_ms: int = 800) -> dict:
     """Listen via microphone and return the user's transcribed instruction.
 
-    Capture ends after the user pauses or timeout_ms elapses. Playback and
-    recording are serialized because voicebridge has no echo cancellation."""
+    Capture ends after the user pauses or timeout_ms elapses. Check
+    speech_detected and end_reason; a timeout may still contain valid speech.
+    Playback and recording are serialized because there is no echo cancellation."""
     try:
         return {"ok": True, **runtime.listen(timeout_ms, silence_ms)}
     except Exception as exc:
