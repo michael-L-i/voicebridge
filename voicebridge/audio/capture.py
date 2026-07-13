@@ -11,7 +11,7 @@ import webrtcvad
 from voicebridge.audio.playback import audio_lock, play_chime_end, play_chime_start
 
 # WebRTC VAD only accepts exactly 10, 20, or 30 ms frames.
-_VAD_AGGRESSIVENESS = 3
+_VAD_AGGRESSIVENESS = 1
 _CHUNK_MS = 30
 _MIN_SPEECH_MS = 500
 _PRE_ROLL_MS = 300
