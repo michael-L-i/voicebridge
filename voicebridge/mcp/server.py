@@ -2,7 +2,14 @@ from mcp.server.fastmcp import FastMCP
 
 from voicebridge.mcp.runtime import VoiceRuntime
 
-mcp = FastMCP("voicebridge")
+mcp = FastMCP(
+    "voicebridge",
+    instructions=(
+        "Local speech input and output for explicit VoiceBridge conversations. "
+        "Only call audio tools after the user explicitly asks to start or continue "
+        "a VoiceBridge voice conversation."
+    ),
+)
 runtime = VoiceRuntime()
 
 
@@ -14,9 +21,10 @@ def _error(exc: Exception) -> dict:
 def voice_start() -> dict:
     """Start a local voice conversation and load the TTS and STT models.
 
-    Call once before the first voice_speak. The initial call may take a while
-    while local model files are downloaded or loaded; later turns reuse the
-    warm models. Only one voicebridge conversation can be active per Mac."""
+    Call only after an explicit user request for a VoiceBridge conversation,
+    once before the first voice_speak. The initial call checks microphone and
+    speaker access before local model files are downloaded or loaded; later
+    turns reuse the warm models. Only one conversation can be active per Mac."""
     try:
         return {"ok": True, **runtime.start()}
     except Exception as exc:
@@ -25,7 +33,7 @@ def voice_start() -> dict:
 
 @mcp.tool()
 def voice_speak(text: str, voice: str | None = None) -> dict:
-    """Speak Claude Code's exact text aloud through local TTS.
+    """Speak the host agent's exact text aloud through local TTS.
 
     Keep text to 1-3 short conversational sentences. Do not include code,
     bullet lists, or file paths. The text is spoken verbatim and is never
@@ -64,7 +72,7 @@ def voice_stop() -> dict:
 
 @mcp.tool()
 def voice_status() -> dict:
-    """Report runtime version, capture settings, backend, and loaded models."""
+    """Report host, first-run state, version, capture settings, and models."""
     return {"ok": True, **runtime.status()}
 
 

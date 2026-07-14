@@ -7,7 +7,7 @@
 #
 # IMPORTANT: stdout is the live MCP stdio JSON-RPC channel. Every log line in
 # this script MUST go to stderr (>&2) -- writing anything to stdout before
-# the final exec corrupts the protocol handshake Claude Code expects.
+# the final exec corrupts the protocol handshake the host expects.
 set -euo pipefail
 
 PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -15,6 +15,15 @@ DATA_DIR="${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}"
 VENV_DIR="${DATA_DIR}/venv"
 MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "[voicebridge] ERROR: VoiceBridge requires macOS on Apple Silicon." >&2
+  exit 1
+fi
+if [ "$(uname -m)" != "arm64" ]; then
+  echo "[voicebridge] ERROR: VoiceBridge requires an Apple Silicon (arm64) shell." >&2
+  exit 1
+fi
 
 mkdir -p "${DATA_DIR}"
 
@@ -24,7 +33,9 @@ mkdir -p "${DATA_DIR}"
 CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" | awk '{print $1}')
 
 NEEDS_INSTALL=1
-if [ -f "${MARKER_FILE}" ] && [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]; then
+if [ -x "${VENV_DIR}/bin/voicebridge-mcp" ] && \
+   [ -f "${MARKER_FILE}" ] && \
+   [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]; then
   NEEDS_INSTALL=0
 fi
 
@@ -33,7 +44,8 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
        "can take a few minutes (dependency install; model weights download" \
        "when voice mode starts for the first time)." >&2
 
-  PYTHON_BIN=$(command -v python3.12 || command -v python3.11 || command -v python3 || true)
+  PYTHON_BIN=$(command -v python3.13 || command -v python3.12 || \
+    command -v python3.11 || command -v python3 || true)
   if [ -z "${PYTHON_BIN}" ]; then
     echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11+" \
          "(e.g. brew install python@3.12) and start a new session." >&2
@@ -43,6 +55,13 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
   # record the symlink directory as its runtime home and fail in ensurepip.
   PYTHON_BIN=$("${PYTHON_BIN}" -c \
     'import os, sys; print(os.path.realpath(sys.executable))')
+  if ! "${PYTHON_BIN}" -c 'import sys; raise SystemExit(sys.version_info < (3, 11))'; then
+    PYTHON_VERSION=$("${PYTHON_BIN}" -c \
+      'import sys; print(".".join(map(str, sys.version_info[:3])))')
+    echo "[voicebridge] ERROR: Python 3.11+ is required; found ${PYTHON_VERSION}." >&2
+    echo "  Install it with: brew install python@3.12" >&2
+    exit 1
+  fi
 
   rm -rf "${VENV_DIR}"
   "${PYTHON_BIN}" -m venv "${VENV_DIR}"

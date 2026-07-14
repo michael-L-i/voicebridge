@@ -7,10 +7,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-# Under the Claude Code plugin, the manifest sets this to ${CLAUDE_PLUGIN_DATA}.
-# (a persistent per-plugin data dir) so config and the active-session lock
-# live there instead of a path hardcoded to one machine. Falls back to
-# ~/.voicebridge for direct-Python development commands.
+# Claude Code sets this to its persistent per-plugin data directory. Codex and
+# direct development use ~/.voicebridge. The machine-wide audio-session lock is
+# deliberately separate so every host contends on the same lock.
 CONFIG_DIR = Path(os.environ.get("VOICEBRIDGE_DATA_DIR", str(Path.home() / ".voicebridge")))
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"

@@ -10,7 +10,7 @@ MIN_FREE_GB_RECOMMENDED = 10
 
 @click.group()
 def main():
-    """voicebridge: a fully local voice companion for Claude Code."""
+    """voicebridge: a fully local voice companion for coding agents."""
 
 
 @main.command()
