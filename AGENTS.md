@@ -2,28 +2,28 @@
 
 ## Project Overview
 
-`voicebridge` is a Claude Code plugin: a fully local voice companion for Apple
-Silicon. Its stdio MCP process owns local TTS and STT models directly while a
-voice conversation is active. There is no HTTP daemon or local summarization
-model; Claude Code provides the exact text sent to TTS.
+`voicebridge` is a Codex and Claude Code plugin: a fully local voice companion
+for Apple Silicon. Its stdio MCP process owns local TTS and STT models directly
+while a voice conversation is active. There is no HTTP daemon or local
+summarization model; the host coding agent provides the exact text sent to TTS.
 
 MLX is the speech inference backend, not a second reasoning layer. Kokoro TTS
 and Parakeet STT run through `mlx-audio`; VoiceBridge never imports or invokes
 `mlx-lm`, even though it is currently installed transitively by `mlx-audio`.
 
-There is no passive narration. The only user experience is `/voicebridge:voice-code`:
+There is no passive narration. Users explicitly start Voice Code with
+`$voice-code` or `/skills` in Codex, or `/voicebridge:voice-code` in Claude Code:
 
-- The user runs the slash command. Claude calls `voice_start`, which loads
-  Kokoro and Parakeet in the MCP process, then speaks a greeting via
-  `voice_speak`.
-- Claude calls `voice_listen` to capture the user's reply via the mic, then
+- The host calls `voice_start`, which preflights audio access, loads Kokoro and
+  Parakeet in the MCP process, then speaks a greeting via `voice_speak`.
+- The host calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
-- Claude calls `voice_speak` again with a short spoken-style update, and the
+- The host calls `voice_speak` again with a short spoken-style update, and the
   loop repeats until the user says something like "stop" or two consecutive
   `voice_listen` calls time out.
-- At that point Claude calls `voice_stop`, which drops both providers, clears
-  the MLX cache, and releases the active-session lock. If the Claude Code
-  session ends unexpectedly, MCP process exit releases its memory and lock.
+- At that point the host calls `voice_stop`, which drops both providers, clears
+  the MLX cache, and releases the active-session lock. If the host session ends
+  unexpectedly, MCP process exit releases its memory and lock.
 
 The MCP process itself is lightweight until voice mode starts. Models remain
 warm between turns, then are released when the conversation stops.
@@ -32,18 +32,20 @@ The package is Python 3.11+ and is configured by `pyproject.toml`.
 
 ## Plugin Layout
 
-This repo is both the plugin and its own marketplace (see
-`.claude-plugin/marketplace.json`), matching the pattern used by
-`mbailey/voicemode`. Users install it via Claude Code's own plugin mechanism
-(`/plugin marketplace add` then `/plugin install`) -- there's no manual
-`claude mcp add` or hand-editing `~/.claude/settings.json` involved.
+This repo is the plugin and its own marketplace for both hosts. Users install it
+through the host's plugin mechanism; there is no manual MCP configuration.
 
 - `.claude-plugin/plugin.json`: plugin manifest and MCP server declaration.
 - `.claude-plugin/marketplace.json`: lets this repo be added as its own
-  marketplace.
+  Claude Code marketplace.
+- `.codex-plugin/plugin.json`: Codex plugin manifest.
+- `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
+- `.mcp.json`: Codex's stdio MCP declaration and first-run timeouts.
+- `skills/voice-code/`: explicit Codex `$voice-code` workflow.
 - `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
-  under `${CLAUDE_PLUGIN_DATA}/venv` on first run (or after a dependency
-  change), then `exec`s into the real `voicebridge-mcp` entrypoint inside it.
+  under `VOICEBRIDGE_DATA_DIR` on first run (or after a dependency change),
+  then `exec`s into the real `voicebridge-mcp` entrypoint inside it. Claude Code
+  points that variable at its plugin data directory; Codex uses `~/.voicebridge`.
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
@@ -56,9 +58,9 @@ This repo is both the plugin and its own marketplace (see
   development. The plugin path invokes the MCP bootstrap instead.
 - `voicebridge/config.py`: Pydantic config models. `CONFIG_DIR` reads the
   `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
-  manifest, falling back to `~/.voicebridge` for direct-Python dev). Existing
-  configs are migrated away from the retired `[daemon]` and `[summarizer]`
-  sections without replacing current voice or audio choices.
+  manifest, falling back to `~/.voicebridge` for Codex and direct-Python dev).
+  Existing configs are migrated away from the retired `[daemon]` and
+  `[summarizer]` sections without replacing current voice or audio choices.
 - `config/default_config.toml`: default speech model and audio settings
   copied into the user's config directory on first run.
 - `voicebridge/audio/capture.py` / `playback.py`: mic capture using a real
@@ -70,6 +72,8 @@ This repo is both the plugin and its own marketplace (see
   start/end chimes mark exactly when the mic is listening. Playback and
   capture are serialized through a shared lock (never record and speak at
   the same instant -- there's no echo cancellation).
+- `voicebridge/audio/preflight.py`: validates configured audio devices and
+  briefly opens the mic without retaining samples before model setup begins.
 - `voicebridge/providers/`: STT/TTS provider abstractions
   (`TTSProvider`/`STTProvider`) and a plain-dict registry keyed by config
   string. Concrete providers: `kokoro_tts.py` (default TTS), `parakeet_stt.py`
@@ -78,10 +82,10 @@ This repo is both the plugin and its own marketplace (see
 - `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_start`,
   `voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
 - `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
-  session lock. Only one Claude Code voice conversation can use the machine's
-  audio devices and model memory at a time. Status includes the running package
-  version and effective capture timing so stale post-update MCP processes are
-  visible instead of silently using old endpointing behavior.
+  machine-wide session lock. Only one VoiceBridge conversation across either
+  host can use the audio devices and model memory at a time. Status includes
+  host, first-run state, running version, and capture timing so stale
+  post-update MCP processes are visible.
 
 ## Local Commands
 
@@ -97,7 +101,7 @@ python -m unittest discover -s tests -v
 For behavioral changes, run the unit tests plus the narrowest relevant manual
 check, usually `voicebridge doctor`, `voicebridge listen-test`, or a direct
 `voice_start`/`voice_speak`/`voice_listen`/`voice_stop` sequence through a real
-MCP client session.
+Codex or Claude Code MCP client session.
 
 ## Development Principles
 

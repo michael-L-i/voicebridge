@@ -1,0 +1,36 @@
+{
+  "name": "voicebridge",
+  "version": "0.3.0",
+  "description": "Fully local voice conversations for Codex and Claude Code on Apple Silicon.",
+  "author": {
+    "name": "Michael Li",
+    "url": "https://github.com/michael-L-i"
+  },
+  "homepage": "https://github.com/michael-L-i/voicebridge",
+  "repository": "https://github.com/michael-L-i/voicebridge",
+  "license": "MIT",
+  "keywords": [
+    "apple-silicon",
+    "codex",
+    "mlx",
+    "speech-to-text",
+    "text-to-speech",
+    "voice-assistant"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "VoiceBridge",
+    "shortDescription": "Local voice conversations for Codex",
+    "longDescription": "Talk naturally with Codex using fully local Kokoro speech and Parakeet transcription on Apple Silicon.",
+    "developerName": "Michael Li",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/michael-L-i/voicebridge",
+    "defaultPrompt": [
+      "Start a local voice coding conversation."
+    ]
+  }
+}
