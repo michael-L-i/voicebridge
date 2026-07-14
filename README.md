@@ -1,5 +1,9 @@
 # voicebridge
 
+[![CI](https://github.com/michael-L-i/voicebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-L-i/voicebridge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+
 VoiceBridge is a local voice conversation plugin for Claude Code on Apple
 Silicon. Run `/voicebridge:voice-code`, talk naturally, and let Claude Code
 decide what to say back.
@@ -112,3 +116,18 @@ Claude Code supplies; it never rewrites or summarizes that text locally.
 `voice_status` reports the running package version and effective endpointing
 settings, which is useful for confirming an update actually restarted the MCP
 process.
+
+## Contributing and support
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+testing, and pull request guidance. Use
+[GitHub Discussions](https://github.com/michael-L-i/voicebridge/discussions) for
+questions and the structured [issue forms](https://github.com/michael-L-i/voicebridge/issues/new/choose)
+for bugs and concrete feature proposals.
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues
+privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+VoiceBridge is released under the [MIT License](LICENSE).

@@ -2,7 +2,32 @@
 name = "voicebridge"
 version = "0.2.5"
 description = "Local Kokoro speech and Parakeet transcription for Claude Code on Apple Silicon"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Michael Li" },
+]
+keywords = [
+  "apple-silicon",
+  "claude-code",
+  "mlx",
+  "speech-to-text",
+  "text-to-speech",
+  "voice-assistant",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: MacOS X",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 dependencies = [
   "mlx-audio>=0.4.4",
   # Kokoro's text frontend needs these, but mlx-audio doesn't declare them --
@@ -32,12 +57,17 @@ dependencies = [
   "click>=8.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/michael-L-i/voicebridge"
+Issues = "https://github.com/michael-L-i/voicebridge/issues"
+Repository = "https://github.com/michael-L-i/voicebridge"
+
 [project.scripts]
 voicebridge = "voicebridge.cli:main"
 voicebridge-mcp = "voicebridge.mcp.server:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

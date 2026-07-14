@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a focused improvement to VoiceBridge
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        VoiceBridge intentionally stays local, small, and focused on active
+        voice conversations. Consider starting a Discussion for early ideas.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions for this idea.
+          required: true
+        - label: This proposal preserves local-first operation and does not add telemetry or a cloud dependency.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful solution and how it fits the current architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or other approaches have you tried?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add mockups, examples, or related projects if useful. Do not attach private audio.
