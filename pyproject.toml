@@ -54,7 +54,7 @@ dependencies = [
   "webrtcvad-wheels>=2.0.14",
   "pydantic>=2.9",
   "mcp>=1.2",
-  "click>=8.1",
+  "click>=8.4.2",
 ]
 
 [project.urls]
