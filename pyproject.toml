@@ -45,7 +45,7 @@ dependencies = [
   "phonemizer-fork",
   "espeakng-loader",
   "sounddevice>=0.5",
-  "numpy>=1.26",
+  "numpy>=2.4.6",
   # Real frame-classifying voice activity detection (Google's WebRTC VAD),
   # replacing a naive RMS energy threshold -- this is the single biggest
   # factor in voicemode's listening feeling more reliable than an amplitude
