@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible problem with VoiceBridge
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Search existing issues first. For security
+        vulnerabilities, use the private reporting link in SECURITY.md.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This report does not contain a security vulnerability or sensitive data.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: VoiceBridge version
+      description: Use the version reported by `voice_status` when possible.
+      placeholder: 0.2.5
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include macOS version, Mac model/chip, Python version, and Claude Code version.
+      placeholder: macOS 15.x, MacBook Pro M3, Python 3.12.x, Claude Code x.y.z
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run ...
+        2. Say ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste a short redacted excerpt. Never attach private transcripts, recordings, tokens, or credentials.
+      render: shell
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include audio device or non-default configuration details when relevant.
