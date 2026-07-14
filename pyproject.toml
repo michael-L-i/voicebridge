@@ -29,7 +29,7 @@ classifiers = [
   "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
 dependencies = [
-  "mlx-audio>=0.4.4",
+  "mlx-audio>=0.4.5",
   # Kokoro's text frontend needs these, but mlx-audio doesn't declare them --
   # misaki[en]'s own extra pins an old spacy/thinc/blis chain that fails to
   # build on Python 3.13 (confirmed still true), so these are declared loose
