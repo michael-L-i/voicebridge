@@ -23,7 +23,7 @@ body:
     attributes:
       label: VoiceBridge version
       description: Use the version reported by `voice_status` when possible.
-      placeholder: 0.2.5
+      placeholder: 0.3.0
     validations:
       required: true
   - type: input

@@ -1,5 +1,6 @@
 import fcntl
 import gc
+import os
 import threading
 import time
 from pathlib import Path
@@ -8,18 +9,24 @@ from typing import Any
 from voicebridge import __version__
 from voicebridge.config import CONFIG_DIR, Config, load_config
 
+SESSION_LOCK_PATH = Path.home() / ".voicebridge" / "active-session.lock"
+_ONBOARDING_MARKER = "onboarding-v1.complete"
+
 
 class VoiceSessionBusy(RuntimeError):
     pass
 
 
 class VoiceRuntime:
-    """Own local voice models for one Claude Code MCP process."""
+    """Own local voice models for one host MCP process."""
 
-    def __init__(self, config: Config | None = None):
+    def __init__(self, config: Config | None = None, *, data_dir: Path | None = None):
         self.config = config or load_config()
+        self.data_dir = Path(data_dir) if data_dir is not None else CONFIG_DIR
+        self.host = os.environ.get("VOICEBRIDGE_HOST", "direct")
         self._operation_lock = threading.RLock()
         self._session_lock_file = None
+        self._last_preflight: dict | None = None
         self._tts: Any = None
         self._stt: Any = None
 
@@ -31,28 +38,47 @@ class VoiceRuntime:
         """Acquire the local voice session and warm both speech models."""
         with self._operation_lock:
             if self.ready:
-                return self.status(already_ready=True)
+                return {
+                    **self.status(already_ready=True),
+                    "preflight": self._last_preflight,
+                }
 
             self._acquire_session_lock()
             started_at = time.monotonic()
+            first_run = self._is_first_run()
             try:
+                from voicebridge.audio.preflight import run_preflight
+
+                self._last_preflight = run_preflight(
+                    input_device=self.config.audio.input_device,
+                    output_device=self.config.audio.output_device,
+                    data_dir=self.data_dir,
+                )
+
                 # Keep heavy MLX imports out of MCP process startup. They are
                 # first needed only when the user explicitly starts voice mode.
-                from voicebridge.providers.registry import get_stt_provider, get_tts_provider
+                from voicebridge.providers.registry import (
+                    get_stt_provider,
+                    get_tts_provider,
+                )
 
                 self._tts = get_tts_provider(self.config.tts).load()
                 self._stt = get_stt_provider(self.config.stt).load()
+                self._mark_onboarding_complete()
             except Exception as exc:
                 self._release_locked()
-                raise RuntimeError(f"could not load local voice models: {exc}") from exc
+                raise RuntimeError(
+                    f"could not start local voice session: {exc}"
+                ) from exc
 
             return {
-                **self.status(),
+                **self.status(first_run=first_run),
+                "preflight": self._last_preflight,
                 "load_ms": int((time.monotonic() - started_at) * 1000),
             }
 
     def speak(self, text: str, voice: str | None = None) -> dict:
-        """Speak Claude Code's exact text with no local rewriting."""
+        """Speak the host agent's exact text with no local rewriting."""
         spoken_text = text.strip()
         if not spoken_text:
             raise ValueError("voice_speak requires non-empty text")
@@ -121,9 +147,16 @@ class VoiceRuntime:
             self._release_locked()
             return {"stopped": stopped}
 
-    def status(self, *, already_ready: bool = False) -> dict:
+    def status(
+        self,
+        *,
+        already_ready: bool = False,
+        first_run: bool | None = None,
+    ) -> dict:
         return {
             "version": __version__,
+            "host": self.host,
+            "first_run": self._is_first_run() if first_run is None else first_run,
             "ready": self.ready,
             "already_ready": already_ready,
             "backend": "mlx-audio",
@@ -145,16 +178,26 @@ class VoiceRuntime:
         if self._session_lock_file is not None:
             return
 
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        lock_file = Path(CONFIG_DIR / "active-session.lock").open("a+")
+        SESSION_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = SESSION_LOCK_PATH.open("a+")
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             lock_file.close()
             raise VoiceSessionBusy(
-                "another Claude Code session is already using voicebridge"
+                "another VoiceBridge session is already using this Mac's audio devices"
             ) from exc
         self._session_lock_file = lock_file
+
+    def _is_first_run(self) -> bool:
+        return not (self.data_dir / _ONBOARDING_MARKER).exists()
+
+    def _mark_onboarding_complete(self) -> None:
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        (self.data_dir / _ONBOARDING_MARKER).write_text(
+            f"voicebridge {__version__}\n",
+            encoding="utf-8",
+        )
 
     def _release_locked(self) -> None:
         self._tts = None

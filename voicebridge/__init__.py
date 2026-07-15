@@ -1,4 +1,4 @@
-"""Local voice tools for Claude Code."""
+"""Local voice tools for Codex and Claude Code."""
 
 from importlib.metadata import PackageNotFoundError, version
 

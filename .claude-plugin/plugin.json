@@ -1,7 +1,7 @@
 {
   "name": "voicebridge",
-  "version": "0.2.5",
-  "description": "Local Kokoro speech and Parakeet transcription for natural Claude Code conversations on Apple Silicon.",
+  "version": "0.3.0",
+  "description": "Fully local Kokoro speech and Parakeet transcription for natural Claude Code conversations on Apple Silicon.",
   "author": {
     "name": "Michael Li"
   },
@@ -10,7 +10,8 @@
     "voicebridge": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/voicebridge-mcp-bootstrap",
       "env": {
-        "VOICEBRIDGE_DATA_DIR": "${CLAUDE_PLUGIN_DATA}"
+        "VOICEBRIDGE_DATA_DIR": "${CLAUDE_PLUGIN_DATA}",
+        "VOICEBRIDGE_HOST": "claude-code"
       }
     }
   }

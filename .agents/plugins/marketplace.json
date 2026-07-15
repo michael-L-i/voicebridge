@@ -1,0 +1,20 @@
+{
+  "name": "voicebridge-marketplace",
+  "interface": {
+    "displayName": "VoiceBridge"
+  },
+  "plugins": [
+    {
+      "name": "voicebridge",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
