@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from voicebridge import __version__
 from voicebridge.config import CONFIG_DIR, Config, load_config
@@ -15,6 +15,35 @@ _ONBOARDING_MARKER = "onboarding-v1.complete"
 
 class VoiceSessionBusy(RuntimeError):
     pass
+
+
+class _QueuedListen:
+    def __init__(self, target: Callable[[], dict]) -> None:
+        self._target = target
+        self._result: dict | None = None
+        self._error: Exception | None = None
+        self._thread = threading.Thread(
+            target=self._run,
+            name="voicebridge-queued-listen",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def _run(self) -> None:
+        try:
+            self._result = self._target()
+        except Exception as exc:
+            self._error = exc
+
+    def wait(self) -> dict:
+        self._thread.join()
+        if self._error is not None:
+            raise self._error
+        if self._result is None:
+            raise RuntimeError("queued microphone capture returned no result")
+        return self._result
 
 
 class VoiceRuntime:
@@ -30,6 +59,8 @@ class VoiceRuntime:
         self._tts: Any = None
         self._stt: Any = None
         self._playback: Any = None
+        self._queued_listen: _QueuedListen | None = None
+        self._queued_listen_lock = threading.Lock()
 
     @property
     def ready(self) -> bool:
@@ -78,7 +109,12 @@ class VoiceRuntime:
                 "load_ms": int((time.monotonic() - started_at) * 1000),
             }
 
-    def speak(self, text: str, voice: str | None = None) -> dict:
+    def speak(
+        self,
+        text: str,
+        voice: str | None = None,
+        listen_after: bool = False,
+    ) -> dict:
         """Speak the host agent's exact text with no local rewriting."""
         spoken_text = text.strip()
         if not spoken_text:
@@ -86,6 +122,12 @@ class VoiceRuntime:
 
         with self._operation_lock:
             self._ensure_started()
+            with self._queued_listen_lock:
+                if self._queued_listen is not None:
+                    raise RuntimeError(
+                        "voice_listen must collect the queued microphone capture "
+                        "before voice_speak is called again"
+                    )
             from voicebridge.audio.playback import play_async
 
             self._wait_for_playback()
@@ -97,6 +139,11 @@ class VoiceRuntime:
                 self._tts.sample_rate,
                 device=self.config.audio.output_device,
             )
+            if listen_after:
+                queued_listen = _QueuedListen(self._run_queued_listen)
+                with self._queued_listen_lock:
+                    self._queued_listen = queued_listen
+                queued_listen.start()
             return {
                 "spoken_text": spoken_text,
                 "duration_ms": int(
@@ -104,6 +151,7 @@ class VoiceRuntime:
                 ),
                 "synthesis_ms": synthesis_ms,
                 "playback_started": self._playback is not None,
+                "listen_queued": listen_after,
             }
 
     def listen(
@@ -111,99 +159,25 @@ class VoiceRuntime:
         timeout_ms: int | None = None,
         silence_ms: int | None = None,
     ) -> dict:
+        with self._queued_listen_lock:
+            queued_listen = self._queued_listen
+            self._queued_listen = None
+        if queued_listen is not None:
+            return {**queued_listen.wait(), "capture_queued": True}
+
         with self._operation_lock:
-            self._ensure_started()
-            self._wait_for_playback()
-            from voicebridge.audio.capture import listen
-            from voicebridge.audio.playback import audio_lock, play_chime_end
-
-            effective_timeout_ms = (
-                timeout_ms if timeout_ms is not None else self.config.stt.max_listen_ms
-            )
-            effective_silence_ms = (
-                silence_ms if silence_ms is not None else self.config.stt.silence_ms
-            )
-            if effective_timeout_ms <= 0:
-                raise ValueError("timeout_ms must be positive")
-            if effective_silence_ms <= 0:
-                raise ValueError("silence_ms must be positive")
-
-            started_at = time.monotonic()
-            deadline = started_at + (effective_timeout_ms / 1000)
-            first_attempt = True
-            transcript = ""
-            transcription_s = 0.0
-            discarded_empty_segments = 0
-            speech_detected = False
-            end_reason = "timeout"
-            error = None
-
-            try:
-                while True:
-                    remaining_s = deadline - time.monotonic()
-                    if remaining_s <= 0:
-                        break
-
-                    result = listen(
-                        self._stt.sample_rate,
-                        silence_ms=effective_silence_ms,
-                        max_listen_ms=max(1, int(remaining_s * 1000)),
-                        input_device=self.config.audio.input_device,
-                        output_device=self.config.audio.output_device,
-                        start_chime=first_attempt,
-                        end_chime=False,
-                    )
-                    first_attempt = False
-                    end_reason = result.end_reason
-                    error = result.error
-
-                    if result.end_reason == "device_error":
-                        speech_detected = result.speech_detected
-                        break
-
-                    if result.speech_detected and result.audio.size > 0:
-                        transcription_started_at = time.monotonic()
-                        candidate = self._stt.transcribe(result.audio).strip()
-                        transcription_s += (
-                            time.monotonic() - transcription_started_at
-                        )
-                        if candidate:
-                            transcript = candidate
-                            speech_detected = True
-                            break
-                        discarded_empty_segments += 1
-
-                    if result.end_reason != "silence":
-                        break
-            finally:
-                try:
-                    with audio_lock:
-                        play_chime_end(self.config.audio.output_device)
-                except Exception as exc:
-                    end_reason = "device_error"
-                    error = error or str(exc)
-
-            if (
-                discarded_empty_segments
-                and not transcript
-                and end_reason != "device_error"
-            ):
-                speech_detected = False
-                end_reason = "timeout"
-
-            return {
-                "transcript": transcript,
-                "duration_ms": int((time.monotonic() - started_at) * 1000),
-                "transcription_ms": int(transcription_s * 1000),
-                "speech_detected": speech_detected,
-                "end_reason": end_reason,
-                "error": error,
-                "silence_ms": effective_silence_ms,
-                "timeout_ms": effective_timeout_ms,
-                "discarded_empty_segments": discarded_empty_segments,
-            }
+            return self._listen_locked(timeout_ms, silence_ms)
 
     def stop(self) -> dict:
+        with self._queued_listen_lock:
+            queued_listen = self._queued_listen
+            self._queued_listen = None
+        if queued_listen is not None:
+            try:
+                queued_listen.wait()
+            except Exception:
+                pass
+
         with self._operation_lock:
             stopped = self.ready or self._session_lock_file is not None
             try:
@@ -244,6 +218,101 @@ class VoiceRuntime:
         self._playback = None
         if playback is not None:
             playback.wait()
+
+    def _run_queued_listen(self) -> dict:
+        with self._operation_lock:
+            return self._listen_locked(None, None)
+
+    def _listen_locked(
+        self,
+        timeout_ms: int | None,
+        silence_ms: int | None,
+    ) -> dict:
+        self._ensure_started()
+        self._wait_for_playback()
+        from voicebridge.audio.capture import listen
+        from voicebridge.audio.playback import audio_lock, play_chime_end
+
+        effective_timeout_ms = (
+            timeout_ms if timeout_ms is not None else self.config.stt.max_listen_ms
+        )
+        effective_silence_ms = (
+            silence_ms if silence_ms is not None else self.config.stt.silence_ms
+        )
+        if effective_timeout_ms <= 0:
+            raise ValueError("timeout_ms must be positive")
+        if effective_silence_ms <= 0:
+            raise ValueError("silence_ms must be positive")
+
+        started_at = time.monotonic()
+        deadline = started_at + (effective_timeout_ms / 1000)
+        first_attempt = True
+        transcript = ""
+        transcription_s = 0.0
+        discarded_empty_segments = 0
+        speech_detected = False
+        end_reason = "timeout"
+        error = None
+
+        try:
+            while True:
+                remaining_s = deadline - time.monotonic()
+                if remaining_s <= 0:
+                    break
+
+                result = listen(
+                    self._stt.sample_rate,
+                    silence_ms=effective_silence_ms,
+                    max_listen_ms=max(1, int(remaining_s * 1000)),
+                    input_device=self.config.audio.input_device,
+                    output_device=self.config.audio.output_device,
+                    start_chime=first_attempt,
+                    end_chime=False,
+                )
+                first_attempt = False
+                end_reason = result.end_reason
+                error = result.error
+
+                if result.end_reason == "device_error":
+                    speech_detected = result.speech_detected
+                    break
+
+                if result.speech_detected and result.audio.size > 0:
+                    transcription_started_at = time.monotonic()
+                    candidate = self._stt.transcribe(result.audio).strip()
+                    transcription_s += time.monotonic() - transcription_started_at
+                    if candidate:
+                        transcript = candidate
+                        speech_detected = True
+                        break
+                    discarded_empty_segments += 1
+
+                if result.end_reason != "silence":
+                    break
+        finally:
+            try:
+                with audio_lock:
+                    play_chime_end(self.config.audio.output_device)
+            except Exception as exc:
+                end_reason = "device_error"
+                error = error or str(exc)
+
+        if discarded_empty_segments and not transcript and end_reason != "device_error":
+            speech_detected = False
+            end_reason = "timeout"
+
+        return {
+            "transcript": transcript,
+            "duration_ms": int((time.monotonic() - started_at) * 1000),
+            "transcription_ms": int(transcription_s * 1000),
+            "speech_detected": speech_detected,
+            "end_reason": end_reason,
+            "error": error,
+            "silence_ms": effective_silence_ms,
+            "timeout_ms": effective_timeout_ms,
+            "discarded_empty_segments": discarded_empty_segments,
+            "capture_queued": False,
+        }
 
     def _acquire_session_lock(self) -> None:
         if self._session_lock_file is not None:

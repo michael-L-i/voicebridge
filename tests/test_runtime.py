@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -123,6 +124,63 @@ class VoiceRuntimeTests(unittest.TestCase):
         playback.wait.assert_called_once()
         self.assertTrue(stopped["stopped"])
         self.assertFalse(runtime.ready)
+
+    def test_listen_after_opens_mic_as_soon_as_playback_finishes(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+        playback_waiting = threading.Event()
+        playback_finished = threading.Event()
+        capture_started = threading.Event()
+
+        class _BlockingPlayback:
+            def wait(self):
+                playback_waiting.set()
+                if not playback_finished.wait(timeout=1):
+                    raise TimeoutError("test playback did not finish")
+
+        capture_result = SimpleNamespace(
+            audio=np.ones(8, dtype=np.float32),
+            speech_detected=True,
+            end_reason="silence",
+            error=None,
+        )
+
+        def capture_listen(*args, **kwargs):
+            capture_started.set()
+            return capture_result
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    playback_module,
+                    "play_async",
+                    return_value=_BlockingPlayback(),
+                ),
+                patch.object(capture_module, "listen", side_effect=capture_listen),
+                patch.object(playback_module, "play_chime_end"),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                spoken = runtime.speak("Your result is ready.", listen_after=True)
+
+                self.assertTrue(playback_waiting.wait(timeout=1))
+                self.assertFalse(capture_started.is_set())
+                playback_finished.set()
+                self.assertTrue(capture_started.wait(timeout=1))
+
+                heard = runtime.listen()
+                runtime.stop()
+
+        self.assertTrue(spoken["listen_queued"])
+        self.assertEqual(heard["transcript"], "heard")
+        self.assertTrue(heard["capture_queued"])
 
     def test_listen_uses_config_timing_unless_overridden(self):
         tts = _FakeTTS()
