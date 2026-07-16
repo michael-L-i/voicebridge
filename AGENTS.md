@@ -103,6 +103,39 @@ check, usually `voicebridge doctor`, `voicebridge listen-test`, or a direct
 `voice_start`/`voice_speak`/`voice_listen`/`voice_stop` sequence through a real
 Codex or Claude Code MCP client session.
 
+## Visible Plugin Test Sessions
+
+When the user asks to launch a VoiceBridge test instance, use `cmux` to create
+and drive a visible, clearly named tab/surface in the user's current workspace.
+Do not create a separate native cmux window unless the user asks for one. Start
+Voice Code on the user's behalf and leave the session open for hands-on audio
+testing; do not ask the user to type routine launch, install, or initialization
+commands.
+
+Support both Claude Code and Codex as first-class test hosts. If the user does
+not name a host, default to Claude Code. If the user names Codex, launch and
+initialize a Codex test tab instead; do not substitute Claude Code merely
+because its direct-checkout workflow is simpler.
+
+- For a local Claude Code branch test, launch Claude from outside the checkout
+  with `--add-dir <checkout> --plugin-dir <checkout>`, then send
+  `/voicebridge:voice-code`. Do not use the checkout itself as Claude's working
+  directory: Claude would also load the repo-level Codex `.mcp.json`, creating
+  a second VoiceBridge server with the wrong host identity. This tests the
+  checkout directly instead of the installed plugin cache.
+- For a local Codex test, confirm the configured marketplace points at the
+  requested checkout, use the documented cachebuster/reinstall flow, start a
+  new Codex session, then send `$voice-code`.
+- For a GitHub release test, update/install the normal GitHub-backed plugin,
+  verify the requested version and source, launch the host without a local
+  plugin override, and start Voice Code.
+- Name the cmux tab with the host, source (`local` or `release`), branch or
+  version, and use `cmux read-screen` to verify startup.
+- Fully stop or close an existing VoiceBridge test before launching another;
+  the machine-wide audio-session lock permits only one active conversation.
+- Treat a new host process as required after changing or reinstalling a plugin.
+  Report the launched host, source path or release version, and cmux target.
+
 ## Development Principles
 
 - Keep changes small, direct, and organized around the existing module
