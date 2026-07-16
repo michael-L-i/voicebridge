@@ -1,6 +1,6 @@
 [project]
 name = "voicebridge"
-version = "0.3.0"
+version = "0.3.1"
 description = "Local voice conversations for Codex and Claude Code on Apple Silicon"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -36,8 +36,9 @@ Maintain two outputs for completed work:
    the concise question and most important tradeoff.
 7. Return to `voice_listen` after each turn. A valid transcript resets the
    consecutive no-speech timeout count.
-8. After one no-speech timeout, check in once. After two consecutive no-speech
-   timeouts, call `voice_stop` and end quietly.
+8. VoiceBridge internally discards noise segments that transcribe to no words.
+   After one remaining no-speech timeout, check in once. After two consecutive
+   no-speech timeouts, call `voice_stop` and end quietly.
 9. On `end_reason: "device_error"`, explain the microphone problem briefly when
    speech still works, call `voice_stop`, and end.
 10. If the user says stop, goodbye, or equivalent, speak a short goodbye, call

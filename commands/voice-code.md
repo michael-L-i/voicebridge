@@ -47,7 +47,8 @@ Use two distinct outputs for each completed request:
 7. When you need a decision, put any detailed options on screen and speak only
    the concise question and the most important tradeoff.
 8. Return to `voice_listen` and continue the conversation.
-9. If `voice_listen` returns `speech_detected: false` with `end_reason:
+9. VoiceBridge internally discards noise segments that transcribe to no words.
+   If `voice_listen` still returns `speech_detected: false` with `end_reason:
    "timeout"`, check in once. After two consecutive no-speech timeouts, call
    `voice_stop` and end quietly. A successful transcript resets this count.
 10. If `end_reason` is `"device_error"`, briefly explain the microphone problem

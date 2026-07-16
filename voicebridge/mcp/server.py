@@ -52,9 +52,11 @@ def voice_listen(
     """Listen via microphone and return the user's transcribed instruction.
 
     Capture ends after the configured pause (two seconds by default) or overall
-    timeout. Optional arguments override config for one call. Check
-    speech_detected and end_reason; a timeout may still contain valid speech.
-    Playback and recording are serialized because there is no echo cancellation."""
+    timeout. Noise segments that transcribe to no words are discarded while the
+    original timeout remains. Optional arguments override config for one call.
+    Check speech_detected and end_reason; a timeout may still contain valid
+    speech. Playback and recording are serialized because there is no echo
+    cancellation."""
     try:
         return {"ok": True, **runtime.listen(timeout_ms, silence_ms)}
     except Exception as exc:

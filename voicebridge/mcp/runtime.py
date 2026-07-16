@@ -107,6 +107,7 @@ class VoiceRuntime:
         with self._operation_lock:
             self._ensure_started()
             from voicebridge.audio.capture import listen
+            from voicebridge.audio.playback import audio_lock, play_chime_end
 
             effective_timeout_ms = (
                 timeout_ms if timeout_ms is not None else self.config.stt.max_listen_ms
@@ -114,31 +115,84 @@ class VoiceRuntime:
             effective_silence_ms = (
                 silence_ms if silence_ms is not None else self.config.stt.silence_ms
             )
+            if effective_timeout_ms <= 0:
+                raise ValueError("timeout_ms must be positive")
+            if effective_silence_ms <= 0:
+                raise ValueError("silence_ms must be positive")
+
             started_at = time.monotonic()
-            result = listen(
-                self._stt.sample_rate,
-                silence_ms=effective_silence_ms,
-                max_listen_ms=effective_timeout_ms,
-                input_device=self.config.audio.input_device,
-                output_device=self.config.audio.output_device,
-            )
-            transcription_started_at = time.monotonic()
-            transcript = (
-                self._stt.transcribe(result.audio)
-                if result.speech_detected and result.audio.size > 0
-                else ""
-            )
+            deadline = started_at + (effective_timeout_ms / 1000)
+            first_attempt = True
+            transcript = ""
+            transcription_s = 0.0
+            discarded_empty_segments = 0
+            speech_detected = False
+            end_reason = "timeout"
+            error = None
+
+            try:
+                while True:
+                    remaining_s = deadline - time.monotonic()
+                    if remaining_s <= 0:
+                        break
+
+                    result = listen(
+                        self._stt.sample_rate,
+                        silence_ms=effective_silence_ms,
+                        max_listen_ms=max(1, int(remaining_s * 1000)),
+                        input_device=self.config.audio.input_device,
+                        output_device=self.config.audio.output_device,
+                        start_chime=first_attempt,
+                        end_chime=False,
+                    )
+                    first_attempt = False
+                    end_reason = result.end_reason
+                    error = result.error
+
+                    if result.end_reason == "device_error":
+                        speech_detected = result.speech_detected
+                        break
+
+                    if result.speech_detected and result.audio.size > 0:
+                        transcription_started_at = time.monotonic()
+                        candidate = self._stt.transcribe(result.audio).strip()
+                        transcription_s += (
+                            time.monotonic() - transcription_started_at
+                        )
+                        if candidate:
+                            transcript = candidate
+                            speech_detected = True
+                            break
+                        discarded_empty_segments += 1
+
+                    if result.end_reason != "silence":
+                        break
+            finally:
+                try:
+                    with audio_lock:
+                        play_chime_end(self.config.audio.output_device)
+                except Exception as exc:
+                    end_reason = "device_error"
+                    error = error or str(exc)
+
+            if (
+                discarded_empty_segments
+                and not transcript
+                and end_reason != "device_error"
+            ):
+                speech_detected = False
+                end_reason = "timeout"
+
             return {
                 "transcript": transcript,
                 "duration_ms": int((time.monotonic() - started_at) * 1000),
-                "transcription_ms": int(
-                    (time.monotonic() - transcription_started_at) * 1000
-                ),
-                "speech_detected": result.speech_detected,
-                "end_reason": result.end_reason,
-                "error": result.error,
+                "transcription_ms": int(transcription_s * 1000),
+                "speech_detected": speech_detected,
+                "end_reason": end_reason,
+                "error": error,
                 "silence_ms": effective_silence_ms,
                 "timeout_ms": effective_timeout_ms,
+                "discarded_empty_segments": discarded_empty_segments,
             }
 
     def stop(self) -> dict:

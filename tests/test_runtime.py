@@ -8,6 +8,13 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
+try:
+    import webrtcvad  # noqa: F401
+except ImportError:
+    sys.modules["webrtcvad"] = SimpleNamespace(Vad=lambda *args: None)
+
+from voicebridge.audio import capture as capture_module
+from voicebridge.audio import playback as playback_module
 from voicebridge.config import Config
 from voicebridge.mcp import runtime as runtime_module
 
@@ -136,10 +143,10 @@ class VoiceRuntimeTests(unittest.TestCase):
                     "voicebridge.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
-                patch(
-                    "voicebridge.audio.capture.listen",
-                    return_value=capture_result,
+                patch.object(
+                    capture_module, "listen", return_value=capture_result
                 ) as listen,
+                patch.object(playback_module, "play_chime_end"),
             ):
                 runtime = runtime_module.VoiceRuntime(config, data_dir=root / "data")
                 configured = runtime.listen()
@@ -152,6 +159,103 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(overridden["timeout_ms"], 12000)
         self.assertEqual(listen.call_args_list[0].kwargs["silence_ms"], 2000)
         self.assertEqual(listen.call_args_list[1].kwargs["silence_ms"], 750)
+
+    def test_empty_transcription_keeps_listening_for_real_speech(self):
+        stt = _FakeSTT()
+        stt.transcribe = Mock(side_effect=["   ", "stop"])
+        registry = _fake_registry(_FakeTTS(), stt)
+        empty_noise = SimpleNamespace(
+            audio=np.ones(8, dtype=np.float32),
+            speech_detected=True,
+            end_reason="silence",
+            error=None,
+        )
+        real_speech = SimpleNamespace(
+            audio=np.ones(8, dtype=np.float32),
+            speech_detected=True,
+            end_reason="silence",
+            error=None,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    capture_module,
+                    "listen",
+                    side_effect=[empty_noise, real_speech],
+                ) as listen,
+                patch.object(playback_module, "play_chime_end") as play_chime_end,
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                result = runtime.listen()
+                runtime.stop()
+
+        self.assertEqual(result["transcript"], "stop")
+        self.assertTrue(result["speech_detected"])
+        self.assertEqual(result["end_reason"], "silence")
+        self.assertEqual(result["discarded_empty_segments"], 1)
+        self.assertEqual(stt.transcribe.call_count, 2)
+        self.assertEqual(listen.call_count, 2)
+        self.assertTrue(listen.call_args_list[0].kwargs["start_chime"])
+        self.assertFalse(listen.call_args_list[0].kwargs["end_chime"])
+        self.assertFalse(listen.call_args_list[1].kwargs["start_chime"])
+        self.assertFalse(listen.call_args_list[1].kwargs["end_chime"])
+        play_chime_end.assert_called_once()
+
+    def test_empty_transcription_then_no_speech_is_a_timeout(self):
+        stt = _FakeSTT()
+        stt.transcribe = Mock(return_value="")
+        registry = _fake_registry(_FakeTTS(), stt)
+        empty_noise = SimpleNamespace(
+            audio=np.ones(8, dtype=np.float32),
+            speech_detected=True,
+            end_reason="silence",
+            error=None,
+        )
+        no_speech = SimpleNamespace(
+            audio=np.zeros(0, dtype=np.float32),
+            speech_detected=False,
+            end_reason="timeout",
+            error=None,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    capture_module,
+                    "listen",
+                    side_effect=[empty_noise, no_speech],
+                ) as listen,
+                patch.object(playback_module, "play_chime_end"),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                result = runtime.listen()
+                runtime.stop()
+
+        self.assertEqual(result["transcript"], "")
+        self.assertFalse(result["speech_detected"])
+        self.assertEqual(result["end_reason"], "timeout")
+        self.assertEqual(result["discarded_empty_segments"], 1)
+        self.assertEqual(stt.transcribe.call_count, 1)
+        self.assertEqual(listen.call_count, 2)
 
     def test_different_hosts_and_data_dirs_share_one_session_lock(self):
         registry = _fake_registry(_FakeTTS(), _FakeSTT())
