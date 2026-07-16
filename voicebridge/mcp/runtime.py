@@ -29,6 +29,7 @@ class VoiceRuntime:
         self._last_preflight: dict | None = None
         self._tts: Any = None
         self._stt: Any = None
+        self._playback: Any = None
 
     @property
     def ready(self) -> bool:
@@ -85,18 +86,24 @@ class VoiceRuntime:
 
         with self._operation_lock:
             self._ensure_started()
-            from voicebridge.audio.playback import play
+            from voicebridge.audio.playback import play_async
 
+            self._wait_for_playback()
             started_at = time.monotonic()
             audio = self._tts.synthesize(spoken_text, voice=voice)
-            play(
+            synthesis_ms = int((time.monotonic() - started_at) * 1000)
+            self._playback = play_async(
                 audio,
                 self._tts.sample_rate,
                 device=self.config.audio.output_device,
             )
             return {
                 "spoken_text": spoken_text,
-                "duration_ms": int((time.monotonic() - started_at) * 1000),
+                "duration_ms": int(
+                    (audio.shape[0] / self._tts.sample_rate) * 1000
+                ),
+                "synthesis_ms": synthesis_ms,
+                "playback_started": self._playback is not None,
             }
 
     def listen(
@@ -106,6 +113,7 @@ class VoiceRuntime:
     ) -> dict:
         with self._operation_lock:
             self._ensure_started()
+            self._wait_for_playback()
             from voicebridge.audio.capture import listen
             from voicebridge.audio.playback import audio_lock, play_chime_end
 
@@ -198,7 +206,10 @@ class VoiceRuntime:
     def stop(self) -> dict:
         with self._operation_lock:
             stopped = self.ready or self._session_lock_file is not None
-            self._release_locked()
+            try:
+                self._wait_for_playback()
+            finally:
+                self._release_locked()
             return {"stopped": stopped}
 
     def status(
@@ -227,6 +238,12 @@ class VoiceRuntime:
     def _ensure_started(self) -> None:
         if not self.ready:
             self.start()
+
+    def _wait_for_playback(self) -> None:
+        playback = self._playback
+        self._playback = None
+        if playback is not None:
+            playback.wait()
 
     def _acquire_session_lock(self) -> None:
         if self._session_lock_file is not None:

@@ -23,15 +23,16 @@ Maintain two outputs for completed work:
    that `host` is `codex`. If not, the MCP process is stale or misconfigured:
    call `voice_stop`, ask the user to start a new Codex session after updating
    or reinstalling the plugin, and end.
-3. Speak a brief one-sentence greeting, then call `voice_listen` immediately
-   after playback finishes. Do not add filler or perform other work between
-   those tool calls.
+3. Speak a brief one-sentence greeting, then call `voice_listen` immediately.
+   It waits for playback to finish before opening the mic. Do not add filler or
+   perform other work between those tool calls.
 4. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Use normal Codex tools to do the
    work silently, without spoken command-by-command narration.
 5. For noticeably long work, first acknowledge it with one natural sentence.
-   When finished, provide the complete written result and speak a separately
-   composed concise summary of the actual outcome.
+   When finished, call `voice_speak` first with a separately composed concise
+   summary. As soon as it returns, stream the complete written result while the
+   summary is still playing so text appears as the user listens.
 6. When a decision is needed, show detailed options in writing and speak only
    the concise question and most important tradeoff.
 7. Return to `voice_listen` after each turn. A valid transcript resets the

@@ -37,7 +37,9 @@ def voice_speak(text: str, voice: str | None = None) -> dict:
 
     Keep text to 1-3 short conversational sentences. Do not include code,
     bullet lists, or file paths. The text is spoken verbatim and is never
-    summarized or rewritten locally. Blocks until playback finishes."""
+    summarized or rewritten locally. Returns once playback starts so the host
+    can stream its written response while speech continues. A subsequent audio
+    operation waits for playback to finish."""
     try:
         return {"ok": True, **runtime.speak(text, voice=voice)}
     except Exception as exc:

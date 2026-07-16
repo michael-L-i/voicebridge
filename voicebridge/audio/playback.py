@@ -13,6 +13,52 @@ _CHIME_FADE_S = 0.01
 _CHIME_TRAILING_SILENCE_S = 0.05
 
 
+class PlaybackHandle:
+    def __init__(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        device: str | int | None,
+    ) -> None:
+        self._started = threading.Event()
+        self._error: Exception | None = None
+        self._thread = threading.Thread(
+            target=self._run,
+            args=(audio, sample_rate, device),
+            name="voicebridge-playback",
+            daemon=True,
+        )
+        self._thread.start()
+        self._started.wait()
+        if self._error is not None:
+            raise self._error
+
+    def _run(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        device: str | int | None,
+    ) -> None:
+        try:
+            with audio_lock:
+                sd.play(
+                    audio,
+                    samplerate=sample_rate,
+                    blocking=False,
+                    device=_device_arg(device),
+                )
+                self._started.set()
+                sd.wait()
+        except Exception as exc:
+            self._error = exc
+            self._started.set()
+
+    def wait(self) -> None:
+        self._thread.join()
+        if self._error is not None:
+            raise self._error
+
+
 def _device_arg(device: str | int | None) -> str | int | None:
     return None if device in (None, "default") else device
 
@@ -29,6 +75,17 @@ def play(
             blocking=True,
             device=_device_arg(device),
         )
+
+
+def play_async(
+    audio: np.ndarray,
+    sample_rate: int,
+    device: str | int | None = None,
+) -> PlaybackHandle | None:
+    """Start playback and return once the audio device accepts it."""
+    if audio.size == 0:
+        return None
+    return PlaybackHandle(audio, sample_rate, device)
 
 
 def _chime_amplitude(device: str | int | None) -> float:

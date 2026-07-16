@@ -29,21 +29,24 @@ Use two distinct outputs for each completed request:
    `voice_stop`, tell the user to fully exit every Claude Code session using
    VoiceBridge and relaunch Claude Code, then end without starting a voice loop.
 2. Once ready, call `voice_speak` with a brief, casual one-sentence greeting,
-   then call `voice_listen` immediately after playback returns. Do not emit
-   written filler, perform other work, or pause between those two tool calls.
+   then call `voice_listen` immediately. It waits for playback to finish before
+   opening the mic. Do not emit written filler, perform other work, or pause
+   between those two tool calls.
 3. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Act on it with your normal tools.
 4. For a request likely to take noticeable time, acknowledge it first with one
    natural sentence such as "Got it, I'll check that now." Then do the work
    silently. Do not narrate individual commands, file reads, or reasoning.
-5. When the work is done, present a complete written result in Claude Code. In
-   the same turn, call `voice_speak` with an independently composed summary of
-   that result. Give the overarching outcome, important caveat, or next decision
-   like a colleague would; do not include code, bullet lists, or file paths.
-6. If the user asks for a summary, summarize the requested subject normally.
-   Give the useful detailed summary in writing and a natural condensed version
-   aloud. Do not explain how VoiceBridge creates spoken summaries unless the
-   user specifically asks about VoiceBridge itself.
+5. When the work is done, call `voice_speak` first with an independently
+   composed summary. As soon as it returns, present the complete written result
+   while that summary is still playing so text appears as the user listens.
+   Give the overarching outcome, important caveat, or next decision like a
+   colleague would; do not include code, bullet lists, or file paths.
+6. If the user asks for a summary, compose both versions, call `voice_speak`
+   with the natural condensed version first, then immediately stream the useful
+   detailed written summary while it plays. Do not explain how VoiceBridge
+   creates spoken summaries unless the user specifically asks about VoiceBridge
+   itself.
 7. When you need a decision, put any detailed options on screen and speak only
    the concise question and the most important tradeoff.
 8. Return to `voice_listen` and continue the conversation.

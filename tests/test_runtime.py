@@ -88,8 +88,10 @@ class VoiceRuntimeTests(unittest.TestCase):
                     "voicebridge.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ) as preflight,
-                patch("voicebridge.audio.playback.play") as play,
+                patch.object(playback_module, "play_async") as play_async,
             ):
+                playback = Mock()
+                play_async.return_value = playback
                 runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "codex")
                 first_start = runtime.start()
                 second_start = runtime.start()
@@ -115,8 +117,10 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(stt.load_count, 1)
         self.assertEqual(tts.spoken, [("Exactly this sentence.", None)])
         self.assertEqual(spoken["spoken_text"], "Exactly this sentence.")
+        self.assertTrue(spoken["playback_started"])
         preflight.assert_called_once()
-        play.assert_called_once()
+        play_async.assert_called_once()
+        playback.wait.assert_called_once()
         self.assertTrue(stopped["stopped"])
         self.assertFalse(runtime.ready)
 
