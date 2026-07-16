@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from voicebridge.audio import playback
 
 
@@ -16,6 +18,24 @@ class ChimeTests(unittest.TestCase):
         )
         self.assertEqual(chime.size, expected_samples)
         self.assertLessEqual(chime.size / playback._CHIME_SAMPLE_RATE, 0.25)
+
+    def test_async_playback_returns_after_start_and_waits_on_handle(self):
+        audio = np.ones(8, dtype=np.float32)
+
+        with (
+            patch.object(playback.sd, "play") as play,
+            patch.object(playback.sd, "wait") as wait,
+        ):
+            handle = playback.play_async(audio, 24000)
+            handle.wait()
+
+        play.assert_called_once_with(
+            audio,
+            samplerate=24000,
+            blocking=False,
+            device=None,
+        )
+        wait.assert_called_once()
 
 
 if __name__ == "__main__":

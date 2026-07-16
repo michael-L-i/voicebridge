@@ -28,32 +28,45 @@ Use two distinct outputs for each completed request:
    wrong, the MCP process survived a plugin update or is misconfigured: call
    `voice_stop`, tell the user to fully exit every Claude Code session using
    VoiceBridge and relaunch Claude Code, then end without starting a voice loop.
-2. Once ready, call `voice_speak` with a brief, casual one-sentence greeting,
-   then call `voice_listen` immediately after playback returns. Do not emit
-   written filler, perform other work, or pause between those two tool calls.
+2. Once ready, call `voice_speak` with `listen_after: true` and a brief, casual
+   one-sentence greeting, then call `voice_listen` immediately. VoiceBridge
+   opens the mic as soon as playback finishes and the listen call collects that
+   queued capture. Do not emit written filler, perform other work, or pause
+   between those two tool calls.
 3. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Act on it with your normal tools.
 4. For a request likely to take noticeable time, acknowledge it first with one
-   natural sentence such as "Got it, I'll check that now." Then do the work
-   silently. Do not narrate individual commands, file reads, or reasoning.
-5. When the work is done, present a complete written result in Claude Code. In
-   the same turn, call `voice_speak` with an independently composed summary of
-   that result. Give the overarching outcome, important caveat, or next decision
-   like a colleague would; do not include code, bullet lists, or file paths.
-6. If the user asks for a summary, summarize the requested subject normally.
-   Give the useful detailed summary in writing and a natural condensed version
-   aloud. Do not explain how VoiceBridge creates spoken summaries unless the
-   user specifically asks about VoiceBridge itself.
+   natural sentence such as "Got it, I'll check that now." Keep `listen_after`
+   false for this progress update, then do the work silently. Do not narrate
+   individual commands, file reads, or reasoning.
+5. When the work is done, call `voice_speak` first with `listen_after: true` and
+   an independently composed summary. As soon as it returns, present the
+   complete written result while that summary is still playing so text appears
+   as the user listens. VoiceBridge will open the mic immediately when playback
+   ends even if the written result is still streaming; call `voice_listen`
+   after the written result to collect that capture. Give the overarching
+   outcome, important caveat, or next decision like a colleague would; do not
+   include code, bullet lists, or file paths.
+6. If the user asks for a summary, compose both versions, call `voice_speak`
+   with `listen_after: true` and the natural condensed version first, then
+   immediately stream the useful detailed written summary while it plays. Do
+   not explain how VoiceBridge creates spoken summaries unless the user
+   specifically asks about VoiceBridge itself.
 7. When you need a decision, put any detailed options on screen and speak only
-   the concise question and the most important tradeoff.
-8. Return to `voice_listen` and continue the conversation.
-9. If `voice_listen` returns `speech_detected: false` with `end_reason:
+   the concise question and the most important tradeoff, with `listen_after:
+   true`.
+8. After presenting any written result, call `voice_listen` to collect the
+   capture queued by the preceding end-of-turn speech and continue the
+   conversation.
+9. VoiceBridge internally discards noise segments that transcribe to no words.
+   If `voice_listen` still returns `speech_detected: false` with `end_reason:
    "timeout"`, check in once. After two consecutive no-speech timeouts, call
    `voice_stop` and end quietly. A successful transcript resets this count.
 10. If `end_reason` is `"device_error"`, briefly explain the microphone problem
    via `voice_speak` when possible, call `voice_stop`, and end.
 11. If the transcript clearly means "stop", "that's all", "goodbye", or similar,
-   speak a short goodbye, call `voice_stop`, and do not listen again.
+   speak a short goodbye with `listen_after` false, call `voice_stop`, and do
+   not listen again.
 12. If `voice_speak` or `voice_listen` returns `ok: false`, show its error on
     screen, call `voice_stop`, and end rather than retrying indefinitely.
 

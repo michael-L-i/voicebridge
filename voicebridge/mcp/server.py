@@ -32,14 +32,26 @@ def voice_start() -> dict:
 
 
 @mcp.tool()
-def voice_speak(text: str, voice: str | None = None) -> dict:
+def voice_speak(
+    text: str,
+    voice: str | None = None,
+    listen_after: bool = False,
+) -> dict:
     """Speak the host agent's exact text aloud through local TTS.
 
     Keep text to 1-3 short conversational sentences. Do not include code,
     bullet lists, or file paths. The text is spoken verbatim and is never
-    summarized or rewritten locally. Blocks until playback finishes."""
+    summarized or rewritten locally. Returns once playback starts so the host
+    can stream its written response while speech continues. Set listen_after
+    when this speech ends a turn: VoiceBridge will open the mic immediately
+    after playback, and the subsequent voice_listen call collects that queued
+    capture instead of starting late. Leave it false for progress updates that
+    are followed by work rather than a user reply."""
     try:
-        return {"ok": True, **runtime.speak(text, voice=voice)}
+        return {
+            "ok": True,
+            **runtime.speak(text, voice=voice, listen_after=listen_after),
+        }
     except Exception as exc:
         return _error(exc)
 
@@ -52,9 +64,13 @@ def voice_listen(
     """Listen via microphone and return the user's transcribed instruction.
 
     Capture ends after the configured pause (two seconds by default) or overall
-    timeout. Optional arguments override config for one call. Check
+    timeout. If the preceding voice_speak queued capture, this collects that
+    already-running listen and its configured timing; otherwise optional
+    arguments override config for this call. Noise segments that transcribe to
+    no words are discarded while the original timeout remains. Check
     speech_detected and end_reason; a timeout may still contain valid speech.
-    Playback and recording are serialized because there is no echo cancellation."""
+    Playback and recording are serialized because there is no echo
+    cancellation."""
     try:
         return {"ok": True, **runtime.listen(timeout_ms, silence_ms)}
     except Exception as exc:

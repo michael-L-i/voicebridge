@@ -20,7 +20,7 @@ class PluginContractTests(unittest.TestCase):
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
 
-        self.assertEqual(project_version, "0.3.0")
+        self.assertEqual(project_version, "0.3.1")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
         self.assertEqual(

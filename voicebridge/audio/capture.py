@@ -58,12 +58,16 @@ def listen(
     *,
     input_device: str | int | None = None,
     output_device: str | int | None = None,
+    start_chime: bool = True,
+    end_chime: bool = True,
 ) -> ListenResult:
     """Capture one utterance with silence endpointing and a rolling deadline.
 
     The returned end reason distinguishes a natural pause, the overall
     no-speech deadline, and an audio-device failure. The deadline is refreshed
     whenever speech is detected so it cannot cut off someone who is talking.
+    Chime controls let a caller combine several candidate captures into one
+    user-visible listening attempt.
     """
     if sample_rate <= 0:
         raise ValueError("sample_rate must be positive")
@@ -101,8 +105,9 @@ def listen(
     with audio_lock:
         chime_started = False
         try:
-            play_chime_start(output_device)
-            chime_started = True
+            if start_chime:
+                play_chime_start(output_device)
+                chime_started = True
             with sd.InputStream(
                 samplerate=sample_rate,
                 channels=1,
@@ -175,7 +180,7 @@ def listen(
             end_reason = "device_error"
             error = str(exc)
         finally:
-            if chime_started:
+            if end_chime and (chime_started or not start_chime):
                 try:
                     play_chime_end(output_device)
                 except Exception as exc:

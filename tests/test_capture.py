@@ -122,6 +122,27 @@ class ListenTests(unittest.TestCase):
         self.assertIn("device disconnected", result.error)
         self.assertFalse(result.speech_detected)
 
+    def test_chimes_can_be_split_across_internal_capture_attempts(self):
+        with (
+            patch.object(
+                capture.sd,
+                "InputStream",
+                lambda **kwargs: _FakeInputStream(**kwargs),
+            ),
+            patch.object(capture, "play_chime_start") as play_start,
+            patch.object(capture, "play_chime_end") as play_end,
+            patch.object(capture, "_SETTLE_MS", 1),
+        ):
+            capture.listen(
+                16000,
+                max_listen_ms=1,
+                start_chime=False,
+                end_chime=False,
+            )
+
+        play_start.assert_not_called()
+        play_end.assert_not_called()
+
     def test_active_speech_refreshes_the_wall_clock_deadline(self):
         frame = np.zeros(480, dtype=np.float32)
         blocks = [frame] * 7
