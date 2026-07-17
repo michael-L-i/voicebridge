@@ -72,6 +72,20 @@ def _preflight_result():
 
 
 class VoiceRuntimeTests(unittest.TestCase):
+    def setUp(self):
+        # Runtime tests use fake providers and never load MLX. Avoid importing
+        # the native extension during cleanup; repeated native registration can
+        # abort an otherwise pure unit-test process on some MLX builds.
+        self._mlx_core = SimpleNamespace(clear_cache=Mock())
+        self._mlx_patch = patch.dict(
+            sys.modules,
+            {"mlx.core": self._mlx_core},
+        )
+        self._mlx_patch.start()
+
+    def tearDown(self):
+        self._mlx_patch.stop()
+
     def test_models_are_reused_and_onboarding_completes_after_loading(self):
         tts = _FakeTTS()
         stt = _FakeSTT()
@@ -124,6 +138,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         playback.wait.assert_called_once()
         self.assertTrue(stopped["stopped"])
         self.assertFalse(runtime.ready)
+        self._mlx_core.clear_cache.assert_called_once()
 
     def test_listen_after_opens_mic_as_soon_as_playback_finishes(self):
         registry = _fake_registry(_FakeTTS(), _FakeSTT())

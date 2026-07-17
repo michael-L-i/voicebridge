@@ -27,16 +27,18 @@ Development requires an Apple Silicon Mac and Python 3.11 or newer. From the
 repository root:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-python -m unittest discover -s tests -v
-voicebridge doctor
+uv sync --locked --python 3.13
+uv run --locked python -m unittest discover -s tests -v
+uv run --locked python scripts/validate_plugin.py
+uv run --locked voicebridge doctor
 ```
 
 The first real voice session can download several speech-model files. Unit
 tests do not load the models or access the microphone.
+
+`uv.lock` is the committed development and CI dependency set. Run
+`uv lock --check` before opening a pull request; change the lockfile only when
+you intentionally change the dependency declaration.
 
 ## Making a change
 
@@ -44,7 +46,7 @@ tests do not load the models or access the microphone.
 2. Keep the patch focused. Avoid unrelated refactors or formatting churn.
 3. Add or update tests for behavior changes.
 4. Update user-facing documentation when configuration or behavior changes.
-5. Run the unit tests before opening a pull request.
+5. Run the locked unit and plugin checks before opening a pull request.
 
 For changes involving audio devices, model loading, or the MCP lifecycle, also
 run the narrowest relevant manual check on Apple Silicon:

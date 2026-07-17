@@ -1,0 +1,51 @@
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+class CiContractTests(unittest.TestCase):
+    def test_ci_uses_locked_apple_silicon_validation(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+        self.assertIn("pull_request:", workflow)
+        self.assertIn("runs-on: macos-14", workflow)
+        self.assertIn('python: ["3.11", "3.13"]', workflow)
+        self.assertIn("uv lock --check", workflow)
+        self.assertIn("uv sync --locked", workflow)
+        self.assertIn("import mlx.core as mx", workflow)
+        self.assertIn("scripts/validate_plugin.py", workflow)
+        self.assertIn("scripts/verify_distribution.py", workflow)
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("actions/dependency-review-action@", workflow)
+
+    def test_release_workflow_verifies_but_never_publishes(self):
+        workflow = (ROOT / ".github/workflows/release-verify.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("release:", workflow)
+        self.assertIn("types: [published]", workflow)
+        self.assertIn("Verify the release tag matches the package version", workflow)
+        self.assertIn("uv build --out-dir", workflow)
+        self.assertNotIn("twine upload", workflow)
+        self.assertNotIn("gh release create", workflow)
+        self.assertNotIn("pypi", workflow.lower())
+
+    def test_plugin_validation_script_passes_for_this_checkout(self):
+        result = subprocess.run(
+            [sys.executable, "scripts/validate_plugin.py"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

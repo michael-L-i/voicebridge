@@ -1,45 +1,60 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  unit-tests:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: macos-14
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
     steps:
-      - name: Check out repository
+      - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install PortAudio
-        run: sudo apt-get update && sudo apt-get install --yes libportaudio2
-      - name: Install unit-test dependencies
+          version: "0.7.11"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Verify the lockfile
+        run: uv lock --check
+
+      - name: Install the locked environment
+        run: uv sync --locked --python "${{ matrix.python }}"
+
+      - name: Verify the native MLX runtime
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install \
-            "numpy>=1.26" \
-            "pydantic>=2.9" \
-            "sounddevice>=0.5" \
-            "webrtcvad-wheels>=2.0.14"
-      - name: Validate package build
-        run: python -m pip wheel --no-deps --wheel-dir /tmp/voicebridge-dist .
+          uv run --locked --python "${{ matrix.python }}" python -c \
+            'import mlx.core as mx; print(mx.default_device())'
+
+      - name: Validate plugin contracts
+        run: uv run --locked --python "${{ matrix.python }}" python scripts/validate_plugin.py
+
       - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+        run: uv run --locked --python "${{ matrix.python }}" python -m unittest discover -s tests -v
+
+      - name: Build and inspect package artifacts
+        run: |
+          artifact_dir="$(mktemp -d)"
+          uv build --out-dir "$artifact_dir"
+          uv run --locked --python "${{ matrix.python }}" python scripts/verify_distribution.py "$artifact_dir"
 
   dependency-review:
     name: Dependency review

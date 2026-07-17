@@ -152,6 +152,17 @@ host supplies; it never rewrites or summarizes that text locally.
 effective endpointing settings, which is useful for confirming an update
 actually restarted the MCP process.
 
+## CI and releases
+
+Pull requests and pushes to `main` run the locked dependency checks, plugin
+contract validation, unit tests, and a package build on GitHub's Apple Silicon
+`macos-14` runner for Python 3.11 and 3.13, including a fresh-process MLX
+native-import smoke check. The release workflow repeats those checks for a
+published GitHub release and verifies that its `vX.Y.Z` tag matches the package
+version. It validates build artifacts only; it does not publish to PyPI or
+require publishing credentials. See [RELEASING.md](RELEASING.md) for the
+maintainer procedure.
+
 ## Contributing and support
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup,

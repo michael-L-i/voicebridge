@@ -11,6 +11,9 @@
 - [ ] I kept this change within VoiceBridge's local-first product scope.
 - [ ] I added or updated tests for behavior changes.
 - [ ] I updated documentation for user-facing changes.
-- [ ] `python -m unittest discover -s tests -v` passes locally.
-- [ ] I did not include credentials, private transcripts, recordings, or model
-      files.
+- [ ] `uv lock --check` passes locally.
+- [ ] `uv run --locked python -m unittest discover -s tests -v` passes locally.
+- [ ] `uv run --locked python scripts/validate_plugin.py` passes locally.
+- [ ] I ran the relevant Apple Silicon manual check, or this change does not need one.
+- [ ] I did not include credentials, private transcripts, recordings, model
+      files, or caches.
