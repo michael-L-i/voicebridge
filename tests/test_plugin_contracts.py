@@ -27,8 +27,21 @@ class PluginContractTests(unittest.TestCase):
             claude["mcpServers"]["voicebridge"]["env"]["VOICEBRIDGE_HOST"],
             "claude-code",
         )
-        self.assertEqual(codex["mcpServers"], "./.mcp.json")
         self.assertEqual(codex["skills"], "./skills/")
+
+    def test_codex_manifest_bundles_mcp_without_project_config(self):
+        codex = _json(".codex-plugin/plugin.json")
+        server = codex["mcpServers"]["voicebridge"]
+
+        self.assertFalse((ROOT / ".mcp.json").exists())
+        self.assertEqual(server["type"], "stdio")
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"], ["./bin/voicebridge-mcp-bootstrap"])
+        self.assertEqual(server["cwd"], ".")
+        self.assertEqual(server["env"]["VOICEBRIDGE_HOST"], "codex")
+        self.assertEqual(server["startup_timeout_sec"], 900)
+        self.assertEqual(server["tool_timeout_sec"], 1800)
+        self.assertEqual(server["default_tools_approval_mode"], "approve")
 
     def test_codex_marketplace_points_at_repo_root_with_required_policy(self):
         marketplace = _json(".agents/plugins/marketplace.json")
@@ -40,19 +53,6 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(entry["policy"]["installation"], "AVAILABLE")
         self.assertEqual(entry["policy"]["authentication"], "ON_INSTALL")
         self.assertEqual(entry["category"], "Productivity")
-
-    def test_codex_mcp_has_first_run_timeouts_and_no_unexpanded_paths(self):
-        raw = (ROOT / ".mcp.json").read_text(encoding="utf-8")
-        server = json.loads(raw)["mcpServers"]["voicebridge"]
-
-        self.assertNotIn("${", raw)
-        self.assertEqual(server["command"], "bash")
-        self.assertEqual(server["args"], ["./bin/voicebridge-mcp-bootstrap"])
-        self.assertEqual(server["cwd"], ".")
-        self.assertEqual(server["env"]["VOICEBRIDGE_HOST"], "codex")
-        self.assertEqual(server["startup_timeout_sec"], 900)
-        self.assertEqual(server["tool_timeout_sec"], 1800)
-        self.assertEqual(server["default_tools_approval_mode"], "approve")
 
     def test_codex_skill_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/voice-code/SKILL.md").read_text(encoding="utf-8")
@@ -118,6 +118,7 @@ class PluginContractTests(unittest.TestCase):
         source = bootstrap.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("VOICEBRIDGE_DEV_DATA_DIR", source)
         self.assertLess(source.index("uname -s"), source.index('rm -rf "${VENV_DIR}"'))
         self.assertLess(
             source.index("version_info < (3, 11)"), source.index('rm -rf "${VENV_DIR}"')

@@ -28,7 +28,7 @@ repository root:
 
 ```bash
 uv sync --locked --python 3.13
-uv run --locked python -m unittest discover -s tests -v
+./dev check
 uv run --locked python scripts/validate_plugin.py
 uv run --locked voicebridge doctor
 ```
@@ -40,13 +40,63 @@ tests do not load the models or access the microphone.
 `uv lock --check` before opening a pull request; change the lockfile only when
 you intentionally change the dependency declaration.
 
+To inspect the checkout's MCP tools without installing either host plugin, run:
+
+```bash
+./dev inspector
+```
+
+This uses an isolated `.voicebridge-dev/` data directory. Opening the Inspector
+can install the Python dependencies, but model weights are not downloaded until
+you call `voice_start`.
+
+To test the complete Claude Code flow from the checkout without installing a
+plugin or marketplace, run:
+
+```bash
+./dev claude
+```
+
+Then invoke `/voicebridge:voice-code`. Claude Code loads the checkout directly
+with `--plugin-dir`, while VoiceBridge keeps its development environment and
+configuration under `.voicebridge-dev/claude/`.
+
+Use `./dev claude --fresh` to exercise first-run model selection again. It
+clears only the development configuration and onboarding marker, retaining the
+private venv so dependency setup does not repeat.
+
+Codex can exercise the same checkout without installing its plugin or adding a
+marketplace:
+
+```bash
+./dev codex
+```
+
+Then invoke `$voice-code`. The launcher supplies the local MCP server through
+one-session Codex overrides, and the repository exposes the canonical skill
+through `.agents/skills/`. No user-level Codex configuration is changed.
+
+Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
+the development venv.
+
+When you need to discard every local-development venv and configuration, first
+close Claude Code, Codex, and MCP Inspector sessions using VoiceBridge, then run:
+
+```bash
+./dev reset
+```
+
+The command moves only `.voicebridge-dev/` to macOS Trash. It does not touch an
+installed plugin's data or the speech libraries' shared model caches.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.
 2. Keep the patch focused. Avoid unrelated refactors or formatting churn.
 3. Add or update tests for behavior changes.
 4. Update user-facing documentation when configuration or behavior changes.
-5. Run the locked unit and plugin checks before opening a pull request.
+5. Run the locked unit and plugin checks, including `./dev check`, before
+   opening a pull request.
 
 For changes involving audio devices, model loading, or the MCP lifecycle, also
 run the narrowest relevant manual check on Apple Silicon:

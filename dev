@@ -1,0 +1,321 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+DEV_DATA_ROOT="${VOICEBRIDGE_DEV_DATA_ROOT:-${REPO_ROOT}/.voicebridge-dev}"
+
+usage() {
+  cat <<'EOF'
+Usage: ./dev <command> [options]
+
+Commands:
+  check       Run local validation and unit tests
+  inspector   Open the checkout's MCP server in MCP Inspector
+  claude      Launch Claude Code with the checkout loaded directly
+  codex       Launch Codex with the checkout's MCP server directly
+  reset       Remove all isolated local-development state
+EOF
+}
+
+check_help() {
+  cat <<'EOF'
+Usage: ./dev check
+
+Run Bash syntax checks, the Python unit tests, and strict Claude plugin
+validation when the Claude Code CLI is installed. This command does not install
+dependencies or download speech models.
+EOF
+}
+
+inspector_help() {
+  cat <<'EOF'
+Usage: ./dev inspector
+
+Launch the checkout's stdio MCP server in the official MCP Inspector with
+isolated development data. The bootstrap installs Python dependencies on its
+first run; speech model weights are downloaded only if you call voice_start.
+EOF
+}
+
+claude_help() {
+  cat <<'EOF'
+Usage: ./dev claude [--fresh] [claude-options]
+
+Launch Claude Code from the repository root with this checkout loaded through
+--plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
+/voicebridge:voice-code to start the local voice flow. Use --fresh to clear the
+development configuration and onboarding marker while keeping the private venv.
+EOF
+}
+
+codex_help() {
+  cat <<'EOF'
+Usage: ./dev codex [--fresh] [codex-options]
+
+Launch Codex from the repository root with one-session MCP configuration that
+points directly at this checkout. Nothing is installed from a marketplace and
+no user Codex configuration is changed. Inside Codex, run $voice-code. Use
+--fresh to clear the development configuration and onboarding marker while
+keeping the private venv.
+EOF
+}
+
+reset_help() {
+  cat <<'EOF'
+Usage: ./dev reset
+
+Move the checkout's complete .voicebridge-dev directory to macOS Trash. This
+removes development venvs, configuration, and onboarding state for Inspector,
+Claude Code, and Codex. Production plugin data and shared model caches are not
+touched. Close every VoiceBridge host session before running this command.
+EOF
+}
+
+development_dir() {
+  local name="$1"
+  local root_real
+  local directory="${DEV_DATA_ROOT}/${name}"
+
+  mkdir -p "${DEV_DATA_ROOT}" "${directory}"
+  root_real=$(cd "${DEV_DATA_ROOT}" && pwd -P)
+  local directory_real
+  directory_real=$(cd "${directory}" && pwd -P)
+  case "${directory_real}/" in
+    "${root_real}/"*)
+      printf '%s\n' "${directory_real}"
+      ;;
+    *)
+      echo "[voicebridge-dev] ERROR: refusing data path outside ${root_real}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+reset_onboarding() {
+  local directory="$1"
+  rm -f -- "${directory}/config.toml" "${directory}/onboarding-v1.complete"
+}
+
+run_reset() {
+  if [ "${1:-}" = "--help" ]; then
+    reset_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    reset_help >&2
+    exit 2
+  fi
+  if [ ! -e "${DEV_DATA_ROOT}" ]; then
+    echo "[voicebridge-dev] no development data to reset"
+    return
+  fi
+
+  local data_root_real
+  data_root_real=$(cd "${DEV_DATA_ROOT}" && pwd -P)
+  if [ "$(basename "${data_root_real}")" != ".voicebridge-dev" ]; then
+    echo "[voicebridge-dev] ERROR: refusing to reset unsafe path: ${data_root_real}" >&2
+    exit 1
+  fi
+
+  local pgrep_bin="${VOICEBRIDGE_DEV_PGREP_BIN:-pgrep}"
+  if command -v "${pgrep_bin}" >/dev/null 2>&1 && \
+     "${pgrep_bin}" -f '[v]oicebridge-mcp' >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: stop every VoiceBridge host session before reset." >&2
+    exit 1
+  fi
+
+  local trash_bin="${VOICEBRIDGE_DEV_TRASH_BIN:-/usr/bin/trash}"
+  if [ ! -x "${trash_bin}" ]; then
+    echo "[voicebridge-dev] ERROR: macOS trash command is unavailable." >&2
+    exit 1
+  fi
+  "${trash_bin}" "${data_root_real}"
+  echo "[voicebridge-dev] moved ${data_root_real} to Trash"
+}
+
+python_bin() {
+  if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    printf '%s\n' "${REPO_ROOT}/.venv/bin/python"
+    return
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return
+  fi
+  echo "[voicebridge-dev] ERROR: Python 3 is required." >&2
+  exit 1
+}
+
+run_check() {
+  if [ "${1:-}" = "--help" ]; then
+    check_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    check_help >&2
+    exit 2
+  fi
+
+  local python
+  python=$(python_bin)
+
+  echo "[voicebridge-dev] checking Bash scripts"
+  bash -n "${REPO_ROOT}/dev" "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+
+  echo "[voicebridge-dev] running unit tests"
+  "${python}" -m unittest discover -s "${REPO_ROOT}/tests" -v
+
+  if command -v claude >/dev/null 2>&1; then
+    echo "[voicebridge-dev] validating Claude plugin"
+    claude plugin validate --strict "${REPO_ROOT}"
+  else
+    echo "[voicebridge-dev] Claude Code is not installed; skipping plugin validation" >&2
+  fi
+}
+
+run_inspector() {
+  if [ "${1:-}" = "--help" ]; then
+    inspector_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    inspector_help >&2
+    exit 2
+  fi
+
+  local npx_bin="${VOICEBRIDGE_DEV_NPX_BIN:-npx}"
+  if ! command -v "${npx_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: npx is required for MCP Inspector." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir inspector)
+  exec "${npx_bin}" -y @modelcontextprotocol/inspector \
+    env \
+    "VOICEBRIDGE_DATA_DIR=${data_dir}" \
+    "VOICEBRIDGE_HOST=inspector" \
+    "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+}
+
+run_claude() {
+  if [ "${1:-}" = "--help" ]; then
+    claude_help
+    return
+  fi
+
+  local fresh=0
+  local -a claude_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        claude_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local claude_bin="${VOICEBRIDGE_DEV_CLAUDE_BIN:-claude}"
+  if ! command -v "${claude_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: Claude Code is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir claude)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[voicebridge-dev] reset Claude development onboarding"
+  fi
+  cd "${REPO_ROOT}"
+  export VOICEBRIDGE_DEV_DATA_DIR="${data_dir}"
+  if [ "${#claude_args[@]}" -eq 0 ]; then
+    exec "${claude_bin}" --plugin-dir "${REPO_ROOT}"
+  fi
+  exec "${claude_bin}" --plugin-dir "${REPO_ROOT}" "${claude_args[@]}"
+}
+
+run_codex() {
+  if [ "${1:-}" = "--help" ]; then
+    codex_help
+    return
+  fi
+
+  local fresh=0
+  local -a codex_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        codex_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local codex_bin="${VOICEBRIDGE_DEV_CODEX_BIN:-codex}"
+  if ! command -v "${codex_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: Codex is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir codex)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[voicebridge-dev] reset Codex development onboarding"
+  fi
+  unset VOICEBRIDGE_DEV_DATA_DIR
+  cd "${REPO_ROOT}"
+  local -a voicebridge_config=(
+    -C "${REPO_ROOT}"
+    -c "mcp_servers.voicebridge.command=${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+    -c "mcp_servers.voicebridge.cwd=${REPO_ROOT}"
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR=${data_dir}"
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex"
+    -c "mcp_servers.voicebridge.startup_timeout_sec=900"
+    -c "mcp_servers.voicebridge.tool_timeout_sec=1800"
+    -c "mcp_servers.voicebridge.default_tools_approval_mode=approve"
+    -c "mcp_servers.voicebridge.required=true"
+  )
+  if [ "${#codex_args[@]}" -eq 0 ]; then
+    exec "${codex_bin}" "${voicebridge_config[@]}"
+  fi
+  exec "${codex_bin}" "${voicebridge_config[@]}" "${codex_args[@]}"
+}
+
+case "${1:-}" in
+  check)
+    shift
+    run_check "$@"
+    ;;
+  inspector)
+    shift
+    run_inspector "$@"
+    ;;
+  claude)
+    shift
+    run_claude "$@"
+    ;;
+  codex)
+    shift
+    run_codex "$@"
+    ;;
+  reset)
+    shift
+    run_reset "$@"
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    echo "[voicebridge-dev] ERROR: unknown command: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

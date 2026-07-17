@@ -154,7 +154,13 @@ Python 3.11 or newer is required.
 python -m pip install -e .
 voicebridge doctor
 voicebridge listen-test
-python -m unittest discover -s tests -v
+./dev check
+./dev inspector
+./dev claude
+./dev claude --fresh
+./dev codex
+./dev codex --fresh
+./dev reset
 ```
 
 The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
