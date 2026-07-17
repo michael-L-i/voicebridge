@@ -61,6 +61,10 @@ Then invoke `/voicebridge:voice-code`. Claude Code loads the checkout directly
 with `--plugin-dir`, while VoiceBridge keeps its development environment and
 configuration under `.voicebridge-dev/claude/`.
 
+Use `./dev claude --fresh` to exercise first-run model selection again. It
+clears only the development configuration and onboarding marker, retaining the
+private venv so dependency setup does not repeat.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

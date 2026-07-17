@@ -37,12 +37,38 @@ EOF
 
 claude_help() {
   cat <<'EOF'
-Usage: ./dev claude [claude-options]
+Usage: ./dev claude [--fresh] [claude-options]
 
 Launch Claude Code from the repository root with this checkout loaded through
 --plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
-/voicebridge:voice-code to start the local voice flow.
+/voicebridge:voice-code to start the local voice flow. Use --fresh to clear the
+development configuration and onboarding marker while keeping the private venv.
 EOF
+}
+
+development_dir() {
+  local name="$1"
+  local root_real
+  local directory="${DEV_DATA_ROOT}/${name}"
+
+  mkdir -p "${DEV_DATA_ROOT}" "${directory}"
+  root_real=$(cd "${DEV_DATA_ROOT}" && pwd -P)
+  local directory_real
+  directory_real=$(cd "${directory}" && pwd -P)
+  case "${directory_real}/" in
+    "${root_real}/"*)
+      printf '%s\n' "${directory_real}"
+      ;;
+    *)
+      echo "[voicebridge-dev] ERROR: refusing data path outside ${root_real}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+reset_onboarding() {
+  local directory="$1"
+  rm -f -- "${directory}/config.toml" "${directory}/onboarding-v1.complete"
 }
 
 python_bin() {
@@ -115,16 +141,38 @@ run_claude() {
     return
   fi
 
+  local fresh=0
+  local -a claude_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        claude_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
   local claude_bin="${VOICEBRIDGE_DEV_CLAUDE_BIN:-claude}"
   if ! command -v "${claude_bin}" >/dev/null 2>&1; then
     echo "[voicebridge-dev] ERROR: Claude Code is not installed." >&2
     exit 1
   fi
 
-  mkdir -p "${DEV_DATA_ROOT}/claude"
+  local data_dir
+  data_dir=$(development_dir claude)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[voicebridge-dev] reset Claude development onboarding"
+  fi
   cd "${REPO_ROOT}"
-  export VOICEBRIDGE_DEV_DATA_DIR="${DEV_DATA_ROOT}/claude"
-  exec "${claude_bin}" --plugin-dir "${REPO_ROOT}" "$@"
+  export VOICEBRIDGE_DEV_DATA_DIR="${data_dir}"
+  if [ "${#claude_args[@]}" -eq 0 ]; then
+    exec "${claude_bin}" --plugin-dir "${REPO_ROOT}"
+  fi
+  exec "${claude_bin}" --plugin-dir "${REPO_ROOT}" "${claude_args[@]}"
 }
 
 case "${1:-}" in

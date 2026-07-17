@@ -78,18 +78,56 @@ class DevCliTests(unittest.TestCase):
 
             result = subprocess.run(
                 [DEV, "claude", "--model", "test-model"],
-                check=True,
+                check=False,
                 capture_output=True,
                 text=True,
                 env=env,
             )
 
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"cwd={ROOT}", result.stdout)
-        self.assertIn(f"data={data_root}/claude", result.stdout)
+        self.assertIn(f"data={data_root.resolve()}/claude", result.stdout)
         self.assertIn("arg=--plugin-dir", result.stdout)
         self.assertIn(f"arg={ROOT}", result.stdout)
         self.assertIn("arg=--model", result.stdout)
         self.assertIn("arg=test-model", result.stdout)
+
+    def test_claude_fresh_resets_onboarding_but_keeps_venv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_claude = temp / "claude"
+            fake_claude.write_text(
+                "#!/bin/bash\nprintf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_claude.chmod(0o755)
+            data_root = temp / "data"
+            claude_data = data_root / "claude"
+            venv = claude_data / "venv"
+            venv.mkdir(parents=True)
+            (claude_data / "config.toml").write_text("configured\n")
+            (claude_data / "onboarding-v1.complete").write_text("done\n")
+            keep = venv / "keep"
+            keep.write_text("warm\n")
+            env = {
+                **os.environ,
+                "VOICEBRIDGE_DEV_CLAUDE_BIN": str(fake_claude),
+                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+            }
+
+            result = subprocess.run(
+                [DEV, "claude", "--fresh"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((claude_data / "config.toml").exists())
+            self.assertFalse((claude_data / "onboarding-v1.complete").exists())
+            self.assertTrue(keep.exists())
+        self.assertNotIn("arg=--fresh", result.stdout)
 
 
 if __name__ == "__main__":
