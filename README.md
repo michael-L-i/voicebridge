@@ -11,8 +11,8 @@ decide what to say back.
 The plugin is deliberately small:
 
 - Codex or Claude Code controls the conversation and writes every spoken response.
-- Kokoro converts the host's text to speech.
-- Parakeet transcribes microphone audio back to text.
+- The selected local TTS model converts the host's text to speech.
+- The selected local STT model transcribes microphone audio back to text.
 - The plugin does not run a daemon, a summarizer, or a second language model.
 
 Detailed answers stay on screen. The host sends a separate concise version to
@@ -22,20 +22,31 @@ reading a terminal response verbatim.
 ## How it works
 
 The host starts one lightweight stdio MCP server with the plugin. The server
-does not load speech models until voice mode begins. `voice_start` first checks
-the configured input and output devices and briefly opens the microphone
-without retaining audio. It then loads Kokoro and Parakeet into that MCP
-process. The same model instances are reused between turns, and `voice_stop`
-releases them and clears the MLX cache.
+does not load speech models until voice mode begins. On a new installation, the
+host first presents the available TTS and STT tiers and saves the user's choice.
+`voice_start` then checks the configured input and output devices, briefly opens
+the microphone without retaining audio, and loads only the selected models.
+The same model instances are reused between turns, and `voice_stop` releases
+them and clears the MLX cache.
 
-VoiceBridge does use MLX, but only for speech inference:
+VoiceBridge offers three local options in each direction, ordered by resource
+use:
 
-- TTS: `mlx-community/Kokoro-82M-bf16` through MLX Audio
-- STT: `mlx-community/parakeet-tdt-0.6b-v3` through MLX Audio
+| TTS | Tier | Download |
+| --- | --- | ---: |
+| Kokoro 82M | Lightweight | 389 MB |
+| Chatterbox Turbo 350M | Balanced | 417 MB |
+| Qwen 0.6B | Heavy, highest quality | 1.97 GB |
 
-There is no Qwen call and no `mlx-lm` import in VoiceBridge. MLX Audio currently
-declares `mlx-lm` as a transitive package dependency, so its executable may be
-present in the private environment even though VoiceBridge never invokes it.
+| STT | Tier | Download |
+| --- | --- | ---: |
+| Moonshine Base 61M | Lightweight | 248 MB |
+| Whisper Small.en 244M | Balanced | 485 MB |
+| Parakeet 0.6B v3 | Heavy, highest accuracy | 2.51 GB |
+
+Some MLX Audio speech implementations reuse `mlx-lm` cache and sampling
+utilities internally. VoiceBridge does not load a local reasoning or
+summarization model; those utilities are only inference plumbing for speech.
 
 Only one voice conversation can own the microphone, speakers, and model memory
 at a time. A machine-wide advisory lock prevents Codex, Claude Code, or direct
@@ -93,11 +104,12 @@ runtime version and capture settings so stale sessions are detected explicitly.
 
 ## First run
 
-The first start creates a private Python environment. The first voice session
-asks macOS for microphone access and validates audio before downloading the
-configured speech models. Model downloads can take several minutes and several
-gigabytes; low disk space is reported as a warning. Later turns reuse the
-loaded models until the conversation ends.
+The first start creates a private Python environment. Before any model download,
+Voice Code asks the user to choose one TTS and one STT tier, with Qwen and
+Whisper preselected. It then asks macOS for microphone access and validates
+audio before downloading only that pair. Model downloads can take several
+minutes; low disk space is reported as a warning. Existing installations keep
+their current configuration and skip the chooser.
 
 ## Configuration
 
@@ -109,14 +121,14 @@ The supported settings are:
 config_version = 2
 
 [tts]
-provider = "kokoro"
-model = "mlx-community/Kokoro-82M-bf16"
-voice = "af_heart"
+provider = "qwen"
+model = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
+voice = "Aiden"
 speed = 1.0
 
 [stt]
-provider = "parakeet"
-model = "mlx-community/parakeet-tdt-0.6b-v3"
+provider = "whisper"
+model = "mlx-community/whisper-small.en-asr-fp16"
 silence_ms = 2000
 max_listen_ms = 30000
 
@@ -145,12 +157,14 @@ voicebridge listen-test
 python -m unittest discover -s tests -v
 ```
 
-The plugin MCP tools are `voice_start`, `voice_speak`, `voice_listen`,
-`voice_stop`, and `voice_status`. `voice_speak` always plays the exact text the
-host supplies; it never rewrites or summarizes that text locally.
-`voice_status` reports the host, first-run state, running package version, and
-effective endpointing settings, which is useful for confirming an update
-actually restarted the MCP process.
+The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
+`voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
+`voice_models` reports the ordered local choices without downloading them, and
+`voice_configure` persists a pair before a voice session begins. `voice_speak`
+always plays the exact text the host supplies; it never rewrites or summarizes
+that text locally. `voice_status` reports the host, first-run state, running
+package version, and effective endpointing settings, which is useful for
+confirming an update actually restarted the MCP process.
 
 ## CI and releases
 

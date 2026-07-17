@@ -6,6 +6,7 @@ mcp = FastMCP(
     "voicebridge",
     instructions=(
         "Local speech input and output for explicit VoiceBridge conversations. "
+        "Model configuration tools may be used during explicit VoiceBridge setup. "
         "Only call audio tools after the user explicitly asks to start or continue "
         "a VoiceBridge voice conversation."
     ),
@@ -15,6 +16,27 @@ runtime = VoiceRuntime()
 
 def _error(exc: Exception) -> dict:
     return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+def voice_models() -> dict:
+    """List local TTS and STT choices from lightest to heaviest.
+
+    Returns stable selection IDs, resource tiers, download sizes, defaults, and
+    the current configured pair. This tool does not download or load a model."""
+    return {"ok": True, **runtime.models()}
+
+
+@mcp.tool()
+def voice_configure(tts: str, stt: str) -> dict:
+    """Persist a TTS and STT selection before voice_start.
+
+    Use IDs returned by voice_models. Existing audio and capture settings are
+    preserved. Models cannot be changed during an active voice conversation."""
+    try:
+        return {"ok": True, **runtime.configure_models(tts, stt)}
+    except Exception as exc:
+        return _error(exc)
 
 
 @mcp.tool()

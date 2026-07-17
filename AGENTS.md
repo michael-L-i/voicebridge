@@ -7,15 +7,19 @@ for Apple Silicon. Its stdio MCP process owns local TTS and STT models directly
 while a voice conversation is active. There is no HTTP daemon or local
 summarization model; the host coding agent provides the exact text sent to TTS.
 
-MLX is the speech inference backend, not a second reasoning layer. Kokoro TTS
-and Parakeet STT run through `mlx-audio`; VoiceBridge never imports or invokes
-`mlx-lm`, even though it is currently installed transitively by `mlx-audio`.
+MLX is the speech inference backend, not a second reasoning layer. Speech
+models run through `mlx-audio`; some TTS implementations reuse `mlx-lm` cache
+and sampling utilities internally, but VoiceBridge never loads a local
+reasoning or summarization model.
 
 There is no passive narration. Users explicitly start Voice Code with
 `$voice-code` or `/skills` in Codex, or `/voicebridge:voice-code` in Claude Code:
 
-- The host calls `voice_start`, which preflights audio access, loads Kokoro and
-  Parakeet in the MCP process, then speaks a greeting via `voice_speak`.
+- On a new install, the host calls `voice_models`, presents the ordered local
+  choices, and persists the selected pair through `voice_configure`.
+- The host calls `voice_start`, which preflights audio access, loads the selected
+  TTS and STT models in the MCP process, then speaks a greeting via
+  `voice_speak`.
 - The host calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
 - The host calls `voice_speak` again with a short spoken-style update, and the
@@ -76,11 +80,11 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   briefly opens the mic without retaining samples before model setup begins.
 - `voicebridge/providers/`: STT/TTS provider abstractions
   (`TTSProvider`/`STTProvider`) and a plain-dict registry keyed by config
-  string. Concrete providers: `kokoro_tts.py` (default TTS), `parakeet_stt.py`
-  (default STT), `whisper_stt.py` (alternate STT, proves the registry swap
-  works via config alone).
-- `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_start`,
-  `voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
+  string. TTS providers are Kokoro, Chatterbox Turbo, and Qwen 0.6B; STT
+  providers are Moonshine Base, Whisper Small, and Parakeet 0.6B.
+- `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_models`,
+  `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`, `voice_stop`,
+  and `voice_status`.
 - `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
   machine-wide session lock. Only one VoiceBridge conversation across either
   host can use the audio devices and model memory at a time. Status includes

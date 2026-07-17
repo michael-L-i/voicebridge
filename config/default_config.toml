@@ -1,14 +1,14 @@
 config_version = 2
 
 [tts]
-provider = "kokoro"
-model = "mlx-community/Kokoro-82M-bf16"
-voice = "af_heart"
+provider = "qwen"
+model = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
+voice = "Aiden"
 speed = 1.0
 
 [stt]
-provider = "parakeet"
-model = "mlx-community/parakeet-tdt-0.6b-v3"
+provider = "whisper"
+model = "mlx-community/whisper-small.en-asr-fp16"
 silence_ms = 2000
 max_listen_ms = 30000
 
