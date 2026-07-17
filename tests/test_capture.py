@@ -1,5 +1,4 @@
 import sys
-import threading
 import time
 import unittest
 from types import SimpleNamespace
@@ -37,28 +36,6 @@ class _FakeInputStream:
         return self
 
     def __exit__(self, exc_type, exc, traceback):
-        return False
-
-
-class _StreamingInputStream:
-    def __init__(self, callback, blocks, interval_s, **kwargs):
-        self._callback = callback
-        self._blocks = blocks
-        self._interval_s = interval_s
-        self._thread = None
-
-    def __enter__(self):
-        def stream_blocks():
-            for block in self._blocks:
-                time.sleep(self._interval_s)
-                self._callback(block[:, None], None, None, None)
-
-        self._thread = threading.Thread(target=stream_blocks)
-        self._thread.start()
-        return self
-
-    def __exit__(self, exc_type, exc, traceback):
-        self._thread.join()
         return False
 
 
@@ -145,18 +122,42 @@ class ListenTests(unittest.TestCase):
 
     def test_active_speech_refreshes_the_wall_clock_deadline(self):
         frame = np.zeros(480, dtype=np.float32)
-        blocks = [frame] * 12
-        stream = lambda **stream_kwargs: _StreamingInputStream(
-            blocks=blocks,
-            interval_s=0.02,
-            **stream_kwargs,
+        blocks = [frame] * 13
+
+        class _Clock:
+            now = 0.0
+
+            def monotonic(self):
+                return self.now
+
+            def advance(self):
+                self.now += 0.02
+
+        clock = _Clock()
+
+        class _TimedQueue:
+            def __init__(self):
+                self.items = []
+
+            def put(self, item):
+                self.items.append(item)
+
+            def get(self, timeout=None):
+                if not self.items:
+                    raise capture.queue.Empty
+                clock.advance()
+                return self.items.pop(0)
+
+        stream = lambda **stream_kwargs: _FakeInputStream(
+            blocks=blocks, **stream_kwargs
         )
 
-        started_at = time.monotonic()
         with (
             patch.object(capture.sd, "InputStream", stream),
             patch.object(capture, "play_chime_start"),
             patch.object(capture, "play_chime_end"),
+            patch.object(capture.queue, "Queue", _TimedQueue),
+            patch.object(capture.time, "monotonic", clock.monotonic),
             patch.object(
                 capture.webrtcvad,
                 "Vad",
@@ -170,9 +171,8 @@ class ListenTests(unittest.TestCase):
                 silence_ms=200,
                 max_listen_ms=200,
             )
-        elapsed = time.monotonic() - started_at
 
-        self.assertGreater(elapsed, 0.2)
+        self.assertGreater(clock.now, 0.2)
         self.assertEqual(result.end_reason, "silence")
         self.assertTrue(result.speech_detected)
 
