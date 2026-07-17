@@ -11,6 +11,7 @@ Usage: ./dev <command> [options]
 Commands:
   check       Run local validation and unit tests
   inspector   Open the checkout's MCP server in MCP Inspector
+  claude      Launch Claude Code with the checkout loaded directly
 EOF
 }
 
@@ -31,6 +32,16 @@ Usage: ./dev inspector
 Launch the checkout's stdio MCP server in the official MCP Inspector with
 isolated development data. The bootstrap installs Python dependencies on its
 first run; speech model weights are downloaded only if you call voice_start.
+EOF
+}
+
+claude_help() {
+  cat <<'EOF'
+Usage: ./dev claude [claude-options]
+
+Launch Claude Code from the repository root with this checkout loaded through
+--plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
+/voicebridge:voice-code to start the local voice flow.
 EOF
 }
 
@@ -98,6 +109,24 @@ run_inspector() {
     "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
 }
 
+run_claude() {
+  if [ "${1:-}" = "--help" ]; then
+    claude_help
+    return
+  fi
+
+  local claude_bin="${VOICEBRIDGE_DEV_CLAUDE_BIN:-claude}"
+  if ! command -v "${claude_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: Claude Code is not installed." >&2
+    exit 1
+  fi
+
+  mkdir -p "${DEV_DATA_ROOT}/claude"
+  cd "${REPO_ROOT}"
+  export VOICEBRIDGE_DEV_DATA_DIR="${DEV_DATA_ROOT}/claude"
+  exec "${claude_bin}" --plugin-dir "${REPO_ROOT}" "$@"
+}
+
 case "${1:-}" in
   check)
     shift
@@ -106,6 +135,10 @@ case "${1:-}" in
   inspector)
     shift
     run_inspector "$@"
+    ;;
+  claude)
+    shift
+    run_claude "$@"
     ;;
   -h|--help|help|"")
     usage

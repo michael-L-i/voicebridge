@@ -120,10 +120,9 @@ not name a host, default to Claude Code. If the user names Codex, launch and
 initialize a Codex test tab instead; do not substitute Claude Code merely
 because its direct-checkout workflow is simpler.
 
-- For a local Claude Code branch test, launch Claude from outside the checkout
-  with `--add-dir <checkout> --plugin-dir <checkout>`, then send
-  `/voicebridge:voice-code`. This tests the checkout directly instead of the
-  installed plugin cache.
+- For a local Claude Code branch test, run `./dev claude`, then send
+  `/voicebridge:voice-code`. This tests the checkout directly through
+  `--plugin-dir` instead of the installed plugin cache.
 - For a local Codex test, confirm the configured marketplace points at the
   requested checkout, use the documented cachebuster/reinstall flow, start a
   new Codex session, then send `$voice-code`.

@@ -50,6 +50,17 @@ This uses an isolated `.voicebridge-dev/` data directory. Opening the Inspector
 can install the Python dependencies, but model weights are not downloaded until
 you call `voice_start`.
 
+To test the complete Claude Code flow from the checkout without installing a
+plugin or marketplace, run:
+
+```bash
+./dev claude
+```
+
+Then invoke `/voicebridge:voice-code`. Claude Code loads the checkout directly
+with `--plugin-dir`, while VoiceBridge keeps its development environment and
+configuration under `.voicebridge-dev/claude/`.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

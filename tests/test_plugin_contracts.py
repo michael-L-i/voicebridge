@@ -104,6 +104,7 @@ class PluginContractTests(unittest.TestCase):
         source = bootstrap.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("VOICEBRIDGE_DEV_DATA_DIR", source)
         self.assertLess(source.index("uname -s"), source.index('rm -rf "${VENV_DIR}"'))
         self.assertLess(
             source.index("version_info < (3, 11)"), source.index('rm -rf "${VENV_DIR}"')

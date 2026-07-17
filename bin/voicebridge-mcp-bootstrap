@@ -1,7 +1,7 @@
 #!/bin/bash
 # Declared as this plugin's MCP server command in the plugin manifest. Ensures a
 # private venv with voicebridge + its local speech deps (mlx-audio, misaki,
-# spacy, ...) exists under VOICEBRIDGE_DATA_DIR, building it on first
+# spacy, ...) exists under the selected data directory, building it on first
 # run (or after a plugin update changes pyproject.toml), then execs into the
 # real voicebridge-mcp entrypoint inside that venv.
 #
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-DATA_DIR="${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}"
+DATA_DIR="${VOICEBRIDGE_DEV_DATA_DIR:-${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}}"
 VENV_DIR="${DATA_DIR}/venv"
 MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
