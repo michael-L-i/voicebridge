@@ -18,7 +18,6 @@
     "voice-assistant"
   ],
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "VoiceBridge",
     "shortDescription": "Local voice conversations for Codex",
