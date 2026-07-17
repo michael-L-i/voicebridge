@@ -23,7 +23,6 @@ def main() -> int:
 
     claude = load_json(".claude-plugin/plugin.json")
     codex = load_json(".codex-plugin/plugin.json")
-    mcp = load_json(".mcp.json")
     version = project["version"]
 
     failures: list[str] = []
@@ -33,10 +32,13 @@ def main() -> int:
         "${CLAUDE_PLUGIN_ROOT}/bin/voicebridge-mcp-bootstrap"
     ):
         failures.append("Claude Code must use the repository bootstrap")
-    if codex.get("mcpServers") != "./.mcp.json":
-        failures.append("Codex manifest must reference .mcp.json")
-    if mcp.get("mcpServers", {}).get("voicebridge", {}).get("command") != "bash":
+    codex_server = codex.get("mcpServers", {}).get("voicebridge", {})
+    if codex_server.get("command") != "bash":
         failures.append("Codex MCP server must launch through bash")
+    if codex_server.get("args") != ["./bin/voicebridge-mcp-bootstrap"]:
+        failures.append("Codex MCP server must use the repository bootstrap")
+    if (ROOT / ".mcp.json").exists():
+        failures.append("Codex MCP configuration must be bundled in the manifest")
 
     required_paths = [
         "bin/voicebridge-mcp-bootstrap",
