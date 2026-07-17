@@ -182,6 +182,43 @@ class DevCliTests(unittest.TestCase):
         self.assertTrue(development_skill.is_symlink())
         self.assertEqual(development_skill.resolve(), ROOT / "skills/voice-code")
 
+    def test_codex_fresh_resets_onboarding_but_keeps_venv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_codex = temp / "codex"
+            fake_codex.write_text(
+                "#!/bin/bash\nprintf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_codex.chmod(0o755)
+            data_root = temp / "data"
+            codex_data = data_root / "codex"
+            venv = codex_data / "venv"
+            venv.mkdir(parents=True)
+            (codex_data / "config.toml").write_text("configured\n")
+            (codex_data / "onboarding-v1.complete").write_text("done\n")
+            keep = venv / "keep"
+            keep.write_text("warm\n")
+            env = {
+                **os.environ,
+                "VOICEBRIDGE_DEV_CODEX_BIN": str(fake_codex),
+                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+            }
+
+            result = subprocess.run(
+                [DEV, "codex", "--fresh"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((codex_data / "config.toml").exists())
+            self.assertFalse((codex_data / "onboarding-v1.complete").exists())
+            self.assertTrue(keep.exists())
+        self.assertNotIn("arg=--fresh", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

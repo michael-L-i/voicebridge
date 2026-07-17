@@ -76,6 +76,9 @@ Then invoke `$voice-code`. The launcher supplies the local MCP server through
 one-session Codex overrides, and the repository exposes the canonical skill
 through `.agents/skills/`. No user-level Codex configuration is changed.
 
+Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
+the development venv.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

@@ -49,11 +49,13 @@ EOF
 
 codex_help() {
   cat <<'EOF'
-Usage: ./dev codex [codex-options]
+Usage: ./dev codex [--fresh] [codex-options]
 
 Launch Codex from the repository root with one-session MCP configuration that
 points directly at this checkout. Nothing is installed from a marketplace and
-no user Codex configuration is changed. Inside Codex, run $voice-code.
+no user Codex configuration is changed. Inside Codex, run $voice-code. Use
+--fresh to clear the development configuration and onboarding marker while
+keeping the private venv.
 EOF
 }
 
@@ -192,6 +194,20 @@ run_codex() {
     return
   fi
 
+  local fresh=0
+  local -a codex_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        codex_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
   local codex_bin="${VOICEBRIDGE_DEV_CODEX_BIN:-codex}"
   if ! command -v "${codex_bin}" >/dev/null 2>&1; then
     echo "[voicebridge-dev] ERROR: Codex is not installed." >&2
@@ -200,19 +216,27 @@ run_codex() {
 
   local data_dir
   data_dir=$(development_dir codex)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[voicebridge-dev] reset Codex development onboarding"
+  fi
   unset VOICEBRIDGE_DEV_DATA_DIR
   cd "${REPO_ROOT}"
-  exec "${codex_bin}" \
-    -C "${REPO_ROOT}" \
-    -c "mcp_servers.voicebridge.command=${REPO_ROOT}/bin/voicebridge-mcp-bootstrap" \
-    -c "mcp_servers.voicebridge.cwd=${REPO_ROOT}" \
-    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR=${data_dir}" \
-    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex" \
-    -c "mcp_servers.voicebridge.startup_timeout_sec=900" \
-    -c "mcp_servers.voicebridge.tool_timeout_sec=1800" \
-    -c "mcp_servers.voicebridge.default_tools_approval_mode=approve" \
-    -c "mcp_servers.voicebridge.required=true" \
-    "$@"
+  local -a voicebridge_config=(
+    -C "${REPO_ROOT}"
+    -c "mcp_servers.voicebridge.command=${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+    -c "mcp_servers.voicebridge.cwd=${REPO_ROOT}"
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR=${data_dir}"
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex"
+    -c "mcp_servers.voicebridge.startup_timeout_sec=900"
+    -c "mcp_servers.voicebridge.tool_timeout_sec=1800"
+    -c "mcp_servers.voicebridge.default_tools_approval_mode=approve"
+    -c "mcp_servers.voicebridge.required=true"
+  )
+  if [ "${#codex_args[@]}" -eq 0 ]; then
+    exec "${codex_bin}" "${voicebridge_config[@]}"
+  fi
+  exec "${codex_bin}" "${voicebridge_config[@]}" "${codex_args[@]}"
 }
 
 case "${1:-}" in
