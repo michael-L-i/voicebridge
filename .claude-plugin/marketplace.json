@@ -8,7 +8,7 @@
     {
       "name": "voicebridge",
       "source": "./",
-      "description": "Local Kokoro speech and Parakeet transcription for natural Claude Code conversations on Apple Silicon."
+      "description": "Configurable local speech and transcription for natural Claude Code conversations on Apple Silicon."
     }
   ]
 }

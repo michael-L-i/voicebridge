@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shutil
@@ -24,15 +25,15 @@ _SILENCE_SETTING = re.compile(
 
 
 class TTSConfig(BaseModel):
-    provider: str = "kokoro"
-    model: str = "mlx-community/Kokoro-82M-bf16"
-    voice: str = "af_heart"
+    provider: str = "qwen"
+    model: str = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
+    voice: str = "Aiden"
     speed: float = 1.0
 
 
 class STTConfig(BaseModel):
-    provider: str = "parakeet"
-    model: str = "mlx-community/parakeet-tdt-0.6b-v3"
+    provider: str = "whisper"
+    model: str = "mlx-community/whisper-small.en-asr-fp16"
     silence_ms: int = _DEFAULT_SILENCE_MS
     max_listen_ms: int = 30000
 
@@ -94,16 +95,7 @@ def _migrate_config(path: Path) -> None:
     if cleaned == original:
         return
 
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        delete=False,
-    ) as temporary:
-        temporary.write(cleaned)
-        temporary_path = Path(temporary.name)
-    temporary_path.replace(path)
+    _write_atomic(path, cleaned)
 
 
 def load_config() -> Config:
@@ -111,3 +103,100 @@ def load_config() -> Config:
     with open(path, "rb") as f:
         data = tomllib.load(f)
     return Config.model_validate(data)
+
+
+def save_model_selection(tts: TTSConfig, stt: STTConfig) -> Config:
+    path = ensure_config_exists()
+    original = path.read_text(encoding="utf-8")
+    updated = _replace_section_settings(
+        original,
+        "tts",
+        {
+            "provider": tts.provider,
+            "model": tts.model,
+            "voice": tts.voice,
+            "speed": tts.speed,
+        },
+    )
+    updated = _replace_section_settings(
+        updated,
+        "stt",
+        {
+            "provider": stt.provider,
+            "model": stt.model,
+            "silence_ms": stt.silence_ms,
+            "max_listen_ms": stt.max_listen_ms,
+        },
+    )
+    if updated != original:
+        _write_atomic(path, updated)
+    return Config.model_validate(tomllib.loads(updated))
+
+
+def _replace_section_settings(
+    text: str,
+    section: str,
+    settings: dict[str, str | int | float],
+) -> str:
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines(keepends=True)
+    start = None
+    end = len(lines)
+
+    for index, line in enumerate(lines):
+        header = _SECTION_HEADER.match(line.rstrip("\r\n"))
+        if header and header.group(1).strip() == section:
+            start = index
+            continue
+        if start is not None and header:
+            end = index
+            break
+
+    if start is None:
+        separator = "" if not text or text.endswith(("\n", "\r")) else newline
+        body = "".join(
+            f"{key} = {json.dumps(value)}{newline}"
+            for key, value in settings.items()
+        )
+        return f"{text}{separator}{newline}[{section}]{newline}{body}"
+
+    remaining = dict(settings)
+    assignment = re.compile(r"^(?P<indent>\s*)(?P<key>[A-Za-z_][\w-]*)\s*=")
+    for index in range(start + 1, end):
+        match = assignment.match(lines[index])
+        if match and match.group("key") in remaining:
+            key = match.group("key")
+            line_ending = (
+                "\r\n"
+                if lines[index].endswith("\r\n")
+                else "\n"
+                if lines[index].endswith("\n")
+                else newline
+            )
+            lines[index] = (
+                f"{match.group('indent')}{key} = {json.dumps(remaining.pop(key))}"
+                f"{line_ending}"
+            )
+
+    if remaining:
+        if end > start + 1 and not lines[end - 1].endswith(("\n", "\r")):
+            lines[end - 1] += newline
+        insertion = [
+            f"{key} = {json.dumps(value)}{newline}"
+            for key, value in remaining.items()
+        ]
+        lines[end:end] = insertion
+    return "".join(lines)
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        delete=False,
+    ) as temporary:
+        temporary.write(text)
+        temporary_path = Path(temporary.name)
+    temporary_path.replace(path)

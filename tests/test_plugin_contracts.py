@@ -20,7 +20,7 @@ class PluginContractTests(unittest.TestCase):
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
 
-        self.assertEqual(project_version, "0.3.1")
+        self.assertEqual(project_version, "0.4.0")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
         self.assertEqual(
@@ -56,10 +56,13 @@ class PluginContractTests(unittest.TestCase):
 
     def test_codex_skill_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/voice-code/SKILL.md").read_text(encoding="utf-8")
+        command = (ROOT / "commands/voice-code.md").read_text(encoding="utf-8")
         metadata = (ROOT / "skills/voice-code/agents/openai.yaml").read_text(
             encoding="utf-8"
         )
         expected_tools = {
+            "voice_models",
+            "voice_configure",
             "voice_start",
             "voice_speak",
             "voice_listen",
@@ -68,10 +71,15 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("allow_implicit_invocation: false", metadata)
         self.assertIn("explicitly invokes $voice-code", skill)
+        self.assertIn("If `first_run` is true", skill)
+        self.assertIn("before any", skill)
+        self.assertIn("model download", skill)
         for tool in expected_tools:
             self.assertIn(f"mcp__voicebridge__{tool}", skill)
+            self.assertIn(f"mcp__voicebridge__{tool}", command)
+        self.assertIn("If `first_run` is true", command)
 
-    def test_server_exposes_only_the_five_existing_tools(self):
+    def test_server_exposes_only_the_seven_voice_tools(self):
         source = (ROOT / "voicebridge/mcp/server.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         tools = {
@@ -88,6 +96,8 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(
             tools,
             {
+                "voice_models",
+                "voice_configure",
                 "voice_start",
                 "voice_speak",
                 "voice_listen",

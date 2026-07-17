@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from voicebridge import __version__
-from voicebridge.config import CONFIG_DIR, Config, load_config
+from voicebridge.config import (
+    CONFIG_DIR,
+    Config,
+    STTConfig,
+    TTSConfig,
+    load_config,
+    save_model_selection,
+)
 
 SESSION_LOCK_PATH = Path.home() / ".voicebridge" / "active-session.lock"
 _ONBOARDING_MARKER = "onboarding-v1.complete"
@@ -208,6 +215,50 @@ class VoiceRuntime:
                 "stt": self.config.stt.model if self._stt is not None else None,
             },
         }
+
+    def models(self) -> dict:
+        from voicebridge.models import model_catalog
+
+        return model_catalog(
+            tts_provider=self.config.tts.provider,
+            tts_model=self.config.tts.model,
+            stt_provider=self.config.stt.provider,
+            stt_model=self.config.stt.model,
+        )
+
+    def configure_models(self, tts: str, stt: str) -> dict:
+        with self._operation_lock:
+            if self.ready or self._session_lock_file is not None:
+                raise RuntimeError(
+                    "voice models cannot be changed during an active session; "
+                    "call voice_stop first"
+                )
+
+            from voicebridge.models import get_model_option
+
+            tts_option = get_model_option("tts", tts)
+            stt_option = get_model_option("stt", stt)
+            tts_config = TTSConfig(
+                provider=tts_option["provider"],
+                model=tts_option["model"],
+                voice=tts_option["voice"],
+                speed=self.config.tts.speed,
+            )
+            stt_config = STTConfig(
+                provider=stt_option["provider"],
+                model=stt_option["model"],
+                silence_ms=self.config.stt.silence_ms,
+                max_listen_ms=self.config.stt.max_listen_ms,
+            )
+            self.config = save_model_selection(tts_config, stt_config)
+            return {
+                "configured": True,
+                "selection": {"tts": tts, "stt": stt},
+                "models": {
+                    "tts": self.config.tts.model,
+                    "stt": self.config.stt.model,
+                },
+            }
 
     def _ensure_started(self) -> None:
         if not self.ready:

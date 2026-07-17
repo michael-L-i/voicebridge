@@ -69,7 +69,7 @@ def doctor():
     if free_gb < MIN_FREE_GB_RECOMMENDED:
         click.echo(
             f"[warn] only {free_gb:.1f}GB free on this volume — model downloads "
-            f"(Kokoro + Parakeet) can total several GB"
+            f"can total several GB for the heaviest speech pair"
         )
     else:
         click.echo(f"[ok]   disk space: {free_gb:.1f}GB free")

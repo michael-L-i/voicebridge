@@ -1,6 +1,6 @@
 {
   "name": "voicebridge",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Fully local voice conversations for Codex and Claude Code on Apple Silicon.",
   "author": {
     "name": "Michael Li",
@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "VoiceBridge",
     "shortDescription": "Local voice conversations for Codex",
-    "longDescription": "Talk naturally with Codex using fully local Kokoro speech and Parakeet transcription on Apple Silicon.",
+    "longDescription": "Talk naturally with Codex using selectable local speech and transcription models on Apple Silicon.",
     "developerName": "Michael Li",
     "category": "Productivity",
     "capabilities": [

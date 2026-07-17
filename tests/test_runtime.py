@@ -16,6 +16,7 @@ except ImportError:
 
 from voicebridge.audio import capture as capture_module
 from voicebridge.audio import playback as playback_module
+from voicebridge import config as config_module
 from voicebridge.config import Config
 from voicebridge.mcp import runtime as runtime_module
 
@@ -85,6 +86,73 @@ class VoiceRuntimeTests(unittest.TestCase):
 
     def tearDown(self):
         self._mlx_patch.stop()
+
+    def test_models_reports_catalog_without_loading_models(self):
+        runtime = runtime_module.VoiceRuntime(Config())
+
+        result = runtime.models()
+
+        self.assertFalse(runtime.ready)
+        self.assertEqual(result["defaults"], {"tts": "qwen", "stt": "whisper"})
+        self.assertEqual(result["current"], result["defaults"])
+        self.assertEqual(
+            [item["id"] for item in result["tts"]],
+            ["kokoro", "chatterbox", "qwen"],
+        )
+        self.assertEqual(
+            [item["id"] for item in result["stt"]],
+            ["moonshine", "whisper", "parakeet"],
+        )
+
+    def test_configure_models_persists_selection_without_loading(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path = root / "config.toml"
+            with (
+                patch.object(config_module, "CONFIG_DIR", root),
+                patch.object(config_module, "CONFIG_PATH", config_path),
+            ):
+                runtime = runtime_module.VoiceRuntime(
+                    Config(
+                        tts={"speed": 1.2},
+                        stt={"silence_ms": 900, "max_listen_ms": 45000},
+                    ),
+                    data_dir=root,
+                )
+                result = runtime.configure_models("kokoro", "moonshine")
+                persisted = config_module.load_config()
+
+        self.assertFalse(runtime.ready)
+        self.assertEqual(result["selection"], {"tts": "kokoro", "stt": "moonshine"})
+        self.assertEqual(persisted.tts.provider, "kokoro")
+        self.assertEqual(persisted.tts.voice, "af_heart")
+        self.assertEqual(persisted.tts.speed, 1.2)
+        self.assertEqual(persisted.stt.provider, "moonshine")
+        self.assertEqual(persisted.stt.silence_ms, 900)
+        self.assertEqual(persisted.stt.max_listen_ms, 45000)
+
+    def test_configure_models_rejects_active_session(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
+                try:
+                    with self.assertRaisesRegex(RuntimeError, "voice_stop"):
+                        runtime.configure_models("kokoro", "moonshine")
+                finally:
+                    runtime.stop()
 
     def test_models_are_reused_and_onboarding_completes_after_loading(self):
         tts = _FakeTTS()
