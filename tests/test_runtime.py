@@ -78,9 +78,11 @@ class VoiceRuntimeTests(unittest.TestCase):
         # the native extension during cleanup; repeated native registration can
         # abort an otherwise pure unit-test process on some MLX builds.
         self._mlx_core = SimpleNamespace(clear_cache=Mock())
+        self._mlx = ModuleType("mlx")
+        self._mlx.core = self._mlx_core
         self._mlx_patch = patch.dict(
             sys.modules,
-            {"mlx.core": self._mlx_core},
+            {"mlx": self._mlx, "mlx.core": self._mlx_core},
         )
         self._mlx_patch.start()
 
