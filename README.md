@@ -33,9 +33,9 @@ VoiceBridge does use MLX, but only for speech inference:
 - TTS: `mlx-community/Kokoro-82M-bf16` through MLX Audio
 - STT: `mlx-community/parakeet-tdt-0.6b-v3` through MLX Audio
 
-There is no Qwen call and no `mlx-lm` import in VoiceBridge. MLX Audio currently
-declares `mlx-lm` as a transitive package dependency, so its executable may be
-present in the private environment even though VoiceBridge never invokes it.
+Some MLX Audio speech implementations reuse `mlx-lm` cache and sampling
+utilities internally. VoiceBridge does not load a local reasoning or
+summarization model; those utilities are only inference plumbing for speech.
 
 Only one voice conversation can own the microphone, speakers, and model memory
 at a time. A machine-wide advisory lock prevents Codex, Claude Code, or direct

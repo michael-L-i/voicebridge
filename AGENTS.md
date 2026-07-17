@@ -7,9 +7,10 @@ for Apple Silicon. Its stdio MCP process owns local TTS and STT models directly
 while a voice conversation is active. There is no HTTP daemon or local
 summarization model; the host coding agent provides the exact text sent to TTS.
 
-MLX is the speech inference backend, not a second reasoning layer. Kokoro TTS
-and Parakeet STT run through `mlx-audio`; VoiceBridge never imports or invokes
-`mlx-lm`, even though it is currently installed transitively by `mlx-audio`.
+MLX is the speech inference backend, not a second reasoning layer. Speech
+models run through `mlx-audio`; some TTS implementations reuse `mlx-lm` cache
+and sampling utilities internally, but VoiceBridge never loads a local
+reasoning or summarization model.
 
 There is no passive narration. Users explicitly start Voice Code with
 `$voice-code` or `/skills` in Codex, or `/voicebridge:voice-code` in Claude Code:

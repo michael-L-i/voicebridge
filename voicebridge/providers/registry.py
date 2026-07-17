@@ -1,11 +1,13 @@
 from voicebridge.config import STTConfig, TTSConfig
 from voicebridge.providers.base import STTProvider, TTSProvider
+from voicebridge.providers.chatterbox_tts import ChatterboxTTSProvider
 from voicebridge.providers.kokoro_tts import KokoroTTSProvider
 from voicebridge.providers.moonshine_stt import MoonshineSTTProvider
 from voicebridge.providers.parakeet_stt import ParakeetSTTProvider
 from voicebridge.providers.whisper_stt import WhisperSTTProvider
 
 TTS_PROVIDERS = {
+    "chatterbox": ChatterboxTTSProvider,
     "kokoro": KokoroTTSProvider,
 }
 
