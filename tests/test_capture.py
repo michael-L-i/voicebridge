@@ -145,10 +145,10 @@ class ListenTests(unittest.TestCase):
 
     def test_active_speech_refreshes_the_wall_clock_deadline(self):
         frame = np.zeros(480, dtype=np.float32)
-        blocks = [frame] * 7
+        blocks = [frame] * 12
         stream = lambda **stream_kwargs: _StreamingInputStream(
             blocks=blocks,
-            interval_s=0.01,
+            interval_s=0.02,
             **stream_kwargs,
         )
 
@@ -160,19 +160,19 @@ class ListenTests(unittest.TestCase):
             patch.object(
                 capture.webrtcvad,
                 "Vad",
-                return_value=_FakeVad([True] * 5 + [False] * 2),
+                return_value=_FakeVad([True] * 5 + [False] * 7),
             ),
             patch.object(capture, "_SETTLE_MS", 1),
             patch.object(capture, "_MIN_SPEECH_MS", 30),
         ):
             result = capture.listen(
                 16000,
-                silence_ms=60,
-                max_listen_ms=35,
+                silence_ms=200,
+                max_listen_ms=200,
             )
         elapsed = time.monotonic() - started_at
 
-        self.assertGreater(elapsed, 0.05)
+        self.assertGreater(elapsed, 0.2)
         self.assertEqual(result.end_reason, "silence")
         self.assertTrue(result.speech_detected)
 
