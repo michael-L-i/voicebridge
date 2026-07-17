@@ -13,6 +13,7 @@ Commands:
   inspector   Open the checkout's MCP server in MCP Inspector
   claude      Launch Claude Code with the checkout loaded directly
   codex       Launch Codex with the checkout's MCP server directly
+  reset       Remove all isolated local-development state
 EOF
 }
 
@@ -59,6 +60,17 @@ keeping the private venv.
 EOF
 }
 
+reset_help() {
+  cat <<'EOF'
+Usage: ./dev reset
+
+Move the checkout's complete .voicebridge-dev directory to macOS Trash. This
+removes development venvs, configuration, and onboarding state for Inspector,
+Claude Code, and Codex. Production plugin data and shared model caches are not
+touched. Close every VoiceBridge host session before running this command.
+EOF
+}
+
 development_dir() {
   local name="$1"
   local root_real
@@ -82,6 +94,43 @@ development_dir() {
 reset_onboarding() {
   local directory="$1"
   rm -f -- "${directory}/config.toml" "${directory}/onboarding-v1.complete"
+}
+
+run_reset() {
+  if [ "${1:-}" = "--help" ]; then
+    reset_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    reset_help >&2
+    exit 2
+  fi
+  if [ ! -e "${DEV_DATA_ROOT}" ]; then
+    echo "[voicebridge-dev] no development data to reset"
+    return
+  fi
+
+  local data_root_real
+  data_root_real=$(cd "${DEV_DATA_ROOT}" && pwd -P)
+  if [ "$(basename "${data_root_real}")" != ".voicebridge-dev" ]; then
+    echo "[voicebridge-dev] ERROR: refusing to reset unsafe path: ${data_root_real}" >&2
+    exit 1
+  fi
+
+  local pgrep_bin="${VOICEBRIDGE_DEV_PGREP_BIN:-pgrep}"
+  if command -v "${pgrep_bin}" >/dev/null 2>&1 && \
+     "${pgrep_bin}" -f '[v]oicebridge-mcp' >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: stop every VoiceBridge host session before reset." >&2
+    exit 1
+  fi
+
+  local trash_bin="${VOICEBRIDGE_DEV_TRASH_BIN:-/usr/bin/trash}"
+  if [ ! -x "${trash_bin}" ]; then
+    echo "[voicebridge-dev] ERROR: macOS trash command is unavailable." >&2
+    exit 1
+  fi
+  "${trash_bin}" "${data_root_real}"
+  echo "[voicebridge-dev] moved ${data_root_real} to Trash"
 }
 
 python_bin() {
@@ -140,10 +189,11 @@ run_inspector() {
     exit 1
   fi
 
-  mkdir -p "${DEV_DATA_ROOT}/inspector"
+  local data_dir
+  data_dir=$(development_dir inspector)
   exec "${npx_bin}" -y @modelcontextprotocol/inspector \
     env \
-    "VOICEBRIDGE_DATA_DIR=${DEV_DATA_ROOT}/inspector" \
+    "VOICEBRIDGE_DATA_DIR=${data_dir}" \
     "VOICEBRIDGE_HOST=inspector" \
     "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
 }
@@ -255,6 +305,10 @@ case "${1:-}" in
   codex)
     shift
     run_codex "$@"
+    ;;
+  reset)
+    shift
+    run_reset "$@"
     ;;
   -h|--help|help|"")
     usage

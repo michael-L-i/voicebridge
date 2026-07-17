@@ -52,7 +52,7 @@ class DevCliTests(unittest.TestCase):
         arguments = result.stdout.splitlines()
         self.assertIn("@modelcontextprotocol/inspector", arguments)
         self.assertIn(
-            f"VOICEBRIDGE_DATA_DIR={data_root}/inspector", arguments
+            f"VOICEBRIDGE_DATA_DIR={data_root.resolve()}/inspector", arguments
         )
         self.assertIn("VOICEBRIDGE_HOST=inspector", arguments)
         self.assertIn(str(ROOT / "bin/voicebridge-mcp-bootstrap"), arguments)
@@ -218,6 +218,66 @@ class DevCliTests(unittest.TestCase):
             self.assertFalse((codex_data / "onboarding-v1.complete").exists())
             self.assertTrue(keep.exists())
         self.assertNotIn("arg=--fresh", result.stdout)
+
+    def test_reset_removes_only_guarded_development_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            data_root = temp / ".voicebridge-dev"
+            (data_root / "codex/venv").mkdir(parents=True)
+            (data_root / "codex/config.toml").write_text("configured\n")
+            fake_pgrep = temp / "pgrep"
+            fake_pgrep.write_text("#!/bin/bash\nexit 1\n", encoding="utf-8")
+            fake_pgrep.chmod(0o755)
+            fake_trash = temp / "trash"
+            fake_trash.write_text(
+                "#!/bin/bash\nrm -rf -- \"$1\"\n",
+                encoding="utf-8",
+            )
+            fake_trash.chmod(0o755)
+            env = {
+                **os.environ,
+                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "VOICEBRIDGE_DEV_PGREP_BIN": str(fake_pgrep),
+                "VOICEBRIDGE_DEV_TRASH_BIN": str(fake_trash),
+            }
+
+            result = subprocess.run(
+                [DEV, "reset"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(data_root.exists())
+        self.assertIn("to Trash", result.stdout)
+
+    def test_reset_refuses_while_voicebridge_process_is_running(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            data_root = temp / ".voicebridge-dev"
+            data_root.mkdir()
+            fake_pgrep = temp / "pgrep"
+            fake_pgrep.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+            fake_pgrep.chmod(0o755)
+            env = {
+                **os.environ,
+                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "VOICEBRIDGE_DEV_PGREP_BIN": str(fake_pgrep),
+            }
+
+            result = subprocess.run(
+                [DEV, "reset"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertTrue(data_root.exists())
+        self.assertIn("stop every VoiceBridge host session", result.stderr)
 
 
 if __name__ == "__main__":

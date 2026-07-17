@@ -79,6 +79,16 @@ through `.agents/skills/`. No user-level Codex configuration is changed.
 Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.
 
+When you need to discard every local-development venv and configuration, first
+close Claude Code, Codex, and MCP Inspector sessions using VoiceBridge, then run:
+
+```bash
+./dev reset
+```
+
+The command moves only `.voicebridge-dev/` to macOS Trash. It does not touch an
+installed plugin's data or the speech libraries' shared model caches.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

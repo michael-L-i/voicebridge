@@ -160,6 +160,7 @@ voicebridge listen-test
 ./dev claude --fresh
 ./dev codex
 ./dev codex --fresh
+./dev reset
 ```
 
 The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
