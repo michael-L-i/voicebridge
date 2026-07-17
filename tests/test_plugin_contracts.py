@@ -29,6 +29,20 @@ class PluginContractTests(unittest.TestCase):
         )
         self.assertEqual(codex["skills"], "./skills/")
 
+    def test_codex_manifest_bundles_mcp_without_project_config(self):
+        codex = _json(".codex-plugin/plugin.json")
+        server = codex["mcpServers"]["voicebridge"]
+
+        self.assertFalse((ROOT / ".mcp.json").exists())
+        self.assertEqual(server["type"], "stdio")
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"], ["./bin/voicebridge-mcp-bootstrap"])
+        self.assertEqual(server["cwd"], ".")
+        self.assertEqual(server["env"]["VOICEBRIDGE_HOST"], "codex")
+        self.assertEqual(server["startup_timeout_sec"], 900)
+        self.assertEqual(server["tool_timeout_sec"], 1800)
+        self.assertEqual(server["default_tools_approval_mode"], "approve")
+
     def test_codex_marketplace_points_at_repo_root_with_required_policy(self):
         marketplace = _json(".agents/plugins/marketplace.json")
         entry = marketplace["plugins"][0]

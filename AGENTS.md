@@ -42,7 +42,10 @@ through the host's plugin mechanism; there is no manual MCP configuration.
 - `.claude-plugin/plugin.json`: plugin manifest and MCP server declaration.
 - `.claude-plugin/marketplace.json`: lets this repo be added as its own
   Claude Code marketplace.
-- `.codex-plugin/plugin.json`: Codex plugin manifest.
+- `.codex-plugin/plugin.json`: Codex plugin manifest with an inline MCP server
+  declaration. Keeping the declaration here instead of in a root `.mcp.json`
+  prevents Claude Code from also discovering it as a project MCP server during
+  direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
 - `skills/voice-code/`: explicit Codex `$voice-code` workflow.
 - `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
