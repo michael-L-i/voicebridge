@@ -28,7 +28,7 @@ repository root:
 
 ```bash
 uv sync --locked --python 3.13
-uv run --locked python -m unittest discover -s tests -v
+./dev check
 uv run --locked python scripts/validate_plugin.py
 uv run --locked voicebridge doctor
 ```
@@ -46,7 +46,8 @@ you intentionally change the dependency declaration.
 2. Keep the patch focused. Avoid unrelated refactors or formatting churn.
 3. Add or update tests for behavior changes.
 4. Update user-facing documentation when configuration or behavior changes.
-5. Run the locked unit and plugin checks before opening a pull request.
+5. Run the locked unit and plugin checks, including `./dev check`, before
+   opening a pull request.
 
 For changes involving audio devices, model loading, or the MCP lifecycle, also
 run the narrowest relevant manual check on Apple Silicon:

@@ -1,0 +1,78 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+
+usage() {
+  cat <<'EOF'
+Usage: ./dev <command> [options]
+
+Commands:
+  check       Run local validation and unit tests
+EOF
+}
+
+check_help() {
+  cat <<'EOF'
+Usage: ./dev check
+
+Run Bash syntax checks, the Python unit tests, and strict Claude plugin
+validation when the Claude Code CLI is installed. This command does not install
+dependencies or download speech models.
+EOF
+}
+
+python_bin() {
+  if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    printf '%s\n' "${REPO_ROOT}/.venv/bin/python"
+    return
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return
+  fi
+  echo "[voicebridge-dev] ERROR: Python 3 is required." >&2
+  exit 1
+}
+
+run_check() {
+  if [ "${1:-}" = "--help" ]; then
+    check_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    check_help >&2
+    exit 2
+  fi
+
+  local python
+  python=$(python_bin)
+
+  echo "[voicebridge-dev] checking Bash scripts"
+  bash -n "${REPO_ROOT}/dev" "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+
+  echo "[voicebridge-dev] running unit tests"
+  "${python}" -m unittest discover -s "${REPO_ROOT}/tests" -v
+
+  if command -v claude >/dev/null 2>&1; then
+    echo "[voicebridge-dev] validating Claude plugin"
+    claude plugin validate --strict "${REPO_ROOT}"
+  else
+    echo "[voicebridge-dev] Claude Code is not installed; skipping plugin validation" >&2
+  fi
+}
+
+case "${1:-}" in
+  check)
+    shift
+    run_check "$@"
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    echo "[voicebridge-dev] ERROR: unknown command: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
