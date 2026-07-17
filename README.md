@@ -155,6 +155,7 @@ python -m pip install -e .
 voicebridge doctor
 voicebridge listen-test
 ./dev check
+./dev inspector
 ```
 
 The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,

@@ -40,6 +40,16 @@ tests do not load the models or access the microphone.
 `uv lock --check` before opening a pull request; change the lockfile only when
 you intentionally change the dependency declaration.
 
+To inspect the checkout's MCP tools without installing either host plugin, run:
+
+```bash
+./dev inspector
+```
+
+This uses an isolated `.voicebridge-dev/` data directory. Opening the Inspector
+can install the Python dependencies, but model weights are not downloaded until
+you call `voice_start`.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

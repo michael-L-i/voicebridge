@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+DEV_DATA_ROOT="${VOICEBRIDGE_DEV_DATA_ROOT:-${REPO_ROOT}/.voicebridge-dev}"
 
 usage() {
   cat <<'EOF'
@@ -9,6 +10,7 @@ Usage: ./dev <command> [options]
 
 Commands:
   check       Run local validation and unit tests
+  inspector   Open the checkout's MCP server in MCP Inspector
 EOF
 }
 
@@ -19,6 +21,16 @@ Usage: ./dev check
 Run Bash syntax checks, the Python unit tests, and strict Claude plugin
 validation when the Claude Code CLI is installed. This command does not install
 dependencies or download speech models.
+EOF
+}
+
+inspector_help() {
+  cat <<'EOF'
+Usage: ./dev inspector
+
+Launch the checkout's stdio MCP server in the official MCP Inspector with
+isolated development data. The bootstrap installs Python dependencies on its
+first run; speech model weights are downloaded only if you call voice_start.
 EOF
 }
 
@@ -62,10 +74,38 @@ run_check() {
   fi
 }
 
+run_inspector() {
+  if [ "${1:-}" = "--help" ]; then
+    inspector_help
+    return
+  fi
+  if [ "$#" -ne 0 ]; then
+    inspector_help >&2
+    exit 2
+  fi
+
+  local npx_bin="${VOICEBRIDGE_DEV_NPX_BIN:-npx}"
+  if ! command -v "${npx_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: npx is required for MCP Inspector." >&2
+    exit 1
+  fi
+
+  mkdir -p "${DEV_DATA_ROOT}/inspector"
+  exec "${npx_bin}" -y @modelcontextprotocol/inspector \
+    env \
+    "VOICEBRIDGE_DATA_DIR=${DEV_DATA_ROOT}/inspector" \
+    "VOICEBRIDGE_HOST=inspector" \
+    "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+}
+
 case "${1:-}" in
   check)
     shift
     run_check "$@"
+    ;;
+  inspector)
+    shift
+    run_inspector "$@"
     ;;
   -h|--help|help|"")
     usage
