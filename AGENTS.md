@@ -123,9 +123,9 @@ because its direct-checkout workflow is simpler.
 - For a local Claude Code branch test, run `./dev claude`, then send
   `/voicebridge:voice-code`. This tests the checkout directly through
   `--plugin-dir` instead of the installed plugin cache.
-- For a local Codex test, confirm the configured marketplace points at the
-  requested checkout, use the documented cachebuster/reinstall flow, start a
-  new Codex session, then send `$voice-code`.
+- For a local Codex branch test, run `./dev codex`, then send `$voice-code`.
+  The launcher injects the checkout's MCP server for that process only and does
+  not install a plugin or configure a marketplace.
 - For a GitHub release test, update/install the normal GitHub-backed plugin,
   verify the requested version and source, launch the host without a local
   plugin override, and start Voice Code.

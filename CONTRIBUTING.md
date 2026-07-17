@@ -65,6 +65,17 @@ Use `./dev claude --fresh` to exercise first-run model selection again. It
 clears only the development configuration and onboarding marker, retaining the
 private venv so dependency setup does not repeat.
 
+Codex can exercise the same checkout without installing its plugin or adding a
+marketplace:
+
+```bash
+./dev codex
+```
+
+Then invoke `$voice-code`. The launcher supplies the local MCP server through
+one-session Codex overrides, and the repository exposes the canonical skill
+through `.agents/skills/`. No user-level Codex configuration is changed.
+
 ## Making a change
 
 1. Fork the repository and create a short-lived branch from `main`.

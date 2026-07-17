@@ -129,6 +129,59 @@ class DevCliTests(unittest.TestCase):
             self.assertTrue(keep.exists())
         self.assertNotIn("arg=--fresh", result.stdout)
 
+    def test_codex_injects_checkout_mcp_without_marketplace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_codex = temp / "codex"
+            fake_codex.write_text(
+                "#!/bin/bash\n"
+                "printf 'cwd=%s\\n' \"$PWD\"\n"
+                "printf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_codex.chmod(0o755)
+            data_root = temp / "data"
+            env = {
+                **os.environ,
+                "VOICEBRIDGE_DEV_CODEX_BIN": str(fake_codex),
+                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+            }
+
+            result = subprocess.run(
+                [DEV, "codex", "--model", "test-model"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        arguments = result.stdout.splitlines()
+        self.assertIn(f"cwd={ROOT}", arguments)
+        self.assertIn("arg=-C", arguments)
+        self.assertIn(f"arg={ROOT}", arguments)
+        self.assertIn(
+            "arg=mcp_servers.voicebridge.command="
+            f"{ROOT}/bin/voicebridge-mcp-bootstrap",
+            arguments,
+        )
+        self.assertIn(
+            "arg=mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR="
+            f"{data_root.resolve()}/codex",
+            arguments,
+        )
+        self.assertIn(
+            "arg=mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex",
+            arguments,
+        )
+        self.assertIn("arg=mcp_servers.voicebridge.required=true", arguments)
+        self.assertNotIn("plugin", " ".join(arguments))
+        self.assertNotIn("marketplace", " ".join(arguments))
+
+    def test_codex_development_skill_points_at_canonical_source(self):
+        development_skill = ROOT / ".agents/skills/voice-code"
+        self.assertTrue(development_skill.is_symlink())
+        self.assertEqual(development_skill.resolve(), ROOT / "skills/voice-code")
+
 
 if __name__ == "__main__":
     unittest.main()

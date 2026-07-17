@@ -12,6 +12,7 @@ Commands:
   check       Run local validation and unit tests
   inspector   Open the checkout's MCP server in MCP Inspector
   claude      Launch Claude Code with the checkout loaded directly
+  codex       Launch Codex with the checkout's MCP server directly
 EOF
 }
 
@@ -43,6 +44,16 @@ Launch Claude Code from the repository root with this checkout loaded through
 --plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
 /voicebridge:voice-code to start the local voice flow. Use --fresh to clear the
 development configuration and onboarding marker while keeping the private venv.
+EOF
+}
+
+codex_help() {
+  cat <<'EOF'
+Usage: ./dev codex [codex-options]
+
+Launch Codex from the repository root with one-session MCP configuration that
+points directly at this checkout. Nothing is installed from a marketplace and
+no user Codex configuration is changed. Inside Codex, run $voice-code.
 EOF
 }
 
@@ -175,6 +186,35 @@ run_claude() {
   exec "${claude_bin}" --plugin-dir "${REPO_ROOT}" "${claude_args[@]}"
 }
 
+run_codex() {
+  if [ "${1:-}" = "--help" ]; then
+    codex_help
+    return
+  fi
+
+  local codex_bin="${VOICEBRIDGE_DEV_CODEX_BIN:-codex}"
+  if ! command -v "${codex_bin}" >/dev/null 2>&1; then
+    echo "[voicebridge-dev] ERROR: Codex is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir codex)
+  unset VOICEBRIDGE_DEV_DATA_DIR
+  cd "${REPO_ROOT}"
+  exec "${codex_bin}" \
+    -C "${REPO_ROOT}" \
+    -c "mcp_servers.voicebridge.command=${REPO_ROOT}/bin/voicebridge-mcp-bootstrap" \
+    -c "mcp_servers.voicebridge.cwd=${REPO_ROOT}" \
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR=${data_dir}" \
+    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex" \
+    -c "mcp_servers.voicebridge.startup_timeout_sec=900" \
+    -c "mcp_servers.voicebridge.tool_timeout_sec=1800" \
+    -c "mcp_servers.voicebridge.default_tools_approval_mode=approve" \
+    -c "mcp_servers.voicebridge.required=true" \
+    "$@"
+}
+
 case "${1:-}" in
   check)
     shift
@@ -187,6 +227,10 @@ case "${1:-}" in
   claude)
     shift
     run_claude "$@"
+    ;;
+  codex)
+    shift
+    run_codex "$@"
     ;;
   -h|--help|help|"")
     usage
