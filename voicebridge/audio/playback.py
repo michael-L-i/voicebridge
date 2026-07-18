@@ -8,8 +8,13 @@ import sounddevice as sd
 audio_lock = threading.Lock()
 
 _CHIME_SAMPLE_RATE = 24000
-_CHIME_TONE_S = 0.1
-_CHIME_FADE_S = 0.01
+# Each note rings out with a fast attack and an exponential decay, like a soft
+# mallet strike; the second note starts while the first is still ringing.
+_CHIME_NOTE_S = 0.16
+_CHIME_NOTE_SPACING_S = 0.07
+_CHIME_ATTACK_S = 0.005
+_CHIME_DECAY_RATE = 18.0
+_CHIME_OVERTONE_LEVEL = 0.35
 _CHIME_TRAILING_SILENCE_S = 0.05
 
 
@@ -106,35 +111,42 @@ def _generate_chime(
     frequencies: list[float], device: str | int | None
 ) -> np.ndarray:
     amplitude = _chime_amplitude(device)
-    tone_samples = int(_CHIME_SAMPLE_RATE * _CHIME_TONE_S)
-    fade_samples = int(_CHIME_SAMPLE_RATE * _CHIME_FADE_S)
-    fade_in = np.linspace(0, 1, fade_samples)
-    fade_out = np.linspace(1, 0, fade_samples)
-
-    tones = []
-    for freq in frequencies:
-        t = np.linspace(0, _CHIME_TONE_S, tone_samples, endpoint=False)
-        tone = (amplitude * np.sin(2 * np.pi * freq * t)).astype(np.float32)
-        tone[:fade_samples] *= fade_in
-        tone[-fade_samples:] *= fade_out
-        tones.append(tone)
-
-    trailing_silence = np.zeros(
-        int(_CHIME_SAMPLE_RATE * _CHIME_TRAILING_SILENCE_S), dtype=np.float32
+    note_samples = int(_CHIME_SAMPLE_RATE * _CHIME_NOTE_S)
+    spacing_samples = int(_CHIME_SAMPLE_RATE * _CHIME_NOTE_SPACING_S)
+    attack_samples = max(1, int(_CHIME_SAMPLE_RATE * _CHIME_ATTACK_S))
+    tail_samples = int(_CHIME_SAMPLE_RATE * _CHIME_TRAILING_SILENCE_S)
+    chime = np.zeros(
+        spacing_samples * (len(frequencies) - 1) + note_samples + tail_samples,
+        dtype=np.float32,
     )
-    return np.concatenate(tones + [trailing_silence])
+
+    t = np.linspace(0, _CHIME_NOTE_S, note_samples, endpoint=False)
+    envelope = np.exp(-t * _CHIME_DECAY_RATE)
+    envelope[:attack_samples] *= np.linspace(0, 1, attack_samples)
+    for index, freq in enumerate(frequencies):
+        note = np.sin(2 * np.pi * freq * t)
+        note += _CHIME_OVERTONE_LEVEL * np.sin(2 * np.pi * 2 * freq * t)
+        offset = index * spacing_samples
+        chime[offset : offset + note_samples] += (note * envelope).astype(
+            np.float32
+        )
+
+    peak = np.max(np.abs(chime))
+    if peak > 0:
+        chime *= amplitude / peak
+    return chime
 
 
 # A short audible cue marking exactly when listening starts/ends. Without
 # this, whether the mic is actually on is invisible to the user -- a big
 # part of why a voice interface stops feeling like a live conversation.
-# Ascending tones for "now listening", descending for "done listening",
-# matching the convention voicemode uses.
+# Two soft mallet-like notes a fifth apart: rising for "now listening",
+# falling for "done listening".
 def play_chime_start(device: str | int | None = None) -> None:
     """Caller must already hold audio_lock -- this doesn't acquire it, so it
     can be sequenced immediately before mic capture within one lock hold."""
     sd.play(
-        _generate_chime([800, 1000], device),
+        _generate_chime([659.26, 987.77], device),
         samplerate=_CHIME_SAMPLE_RATE,
         blocking=True,
         device=_device_arg(device),
@@ -144,7 +156,7 @@ def play_chime_start(device: str | int | None = None) -> None:
 def play_chime_end(device: str | int | None = None) -> None:
     """Caller must already hold audio_lock."""
     sd.play(
-        _generate_chime([1000, 800], device),
+        _generate_chime([987.77, 659.26], device),
         samplerate=_CHIME_SAMPLE_RATE,
         blocking=True,
         device=_device_arg(device),
