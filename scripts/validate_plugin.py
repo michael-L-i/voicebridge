@@ -43,9 +43,12 @@ def main() -> int:
     required_paths = [
         "bin/voicebridge-mcp-bootstrap",
         "commands/voice-code.md",
+        "commands/voice-settings.md",
         "config/default_config.toml",
         "skills/voice-code/SKILL.md",
         "skills/voice-code/agents/openai.yaml",
+        "skills/voice-settings/SKILL.md",
+        "skills/voice-settings/agents/openai.yaml",
     ]
     for relative_path in required_paths:
         if not (ROOT / relative_path).is_file():
