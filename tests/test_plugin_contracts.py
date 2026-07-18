@@ -79,6 +79,31 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn(f"mcp__voicebridge__{tool}", command)
         self.assertIn("If `first_run` is true", command)
 
+    def test_settings_are_available_from_both_host_uis(self):
+        skill = (ROOT / "skills/voice-settings/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        command = (ROOT / "commands/voice-settings.md").read_text(
+            encoding="utf-8"
+        )
+        metadata = (ROOT / "skills/voice-settings/agents/openai.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("explicitly invokes $voice-settings", skill)
+        self.assertIn("allow_implicit_invocation: false", metadata)
+        for tool in {"voice_status", "voice_models", "voice_configure", "voice_stop"}:
+            self.assertIn(f"mcp__voicebridge__{tool}", skill)
+            self.assertIn(f"mcp__voicebridge__{tool}", command)
+        self.assertIn("Do not call `mcp__voicebridge__voice_start`", skill)
+        self.assertIn("Do not call `mcp__voicebridge__voice_start`", command)
+
+        codex = _json(".codex-plugin/plugin.json")
+        self.assertIn(
+            "Choose VoiceBridge speech and transcription models.",
+            codex["interface"]["defaultPrompt"],
+        )
+
     def test_server_exposes_only_the_seven_voice_tools(self):
         source = (ROOT / "voicebridge/mcp/server.py").read_text(encoding="utf-8")
         tree = ast.parse(source)

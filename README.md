@@ -64,7 +64,8 @@ codex plugin add voicebridge@voicebridge-marketplace
 ```
 
 Start a new Codex session after installation. Invoke `$voice-code` in a prompt,
-or select Voice Code from `/skills`.
+or select Voice Code from `/skills`. To change the saved speech models later,
+invoke `$voice-settings` or choose VoiceBridge Settings from `/skills`.
 
 To update an installed release:
 
@@ -90,6 +91,12 @@ Restart Claude Code after installation, then run:
 /voicebridge:voice-code
 ```
 
+To change the saved speech models later, run:
+
+```text
+/voicebridge:voice-settings
+```
+
 To update an installed release:
 
 ```text
@@ -109,7 +116,9 @@ Voice Code asks the user to choose one TTS and one STT tier, with Qwen and
 Whisper preselected. It then asks macOS for microphone access and validates
 audio before downloading only that pair. Model downloads can take several
 minutes; low disk space is reported as a warning. Existing installations keep
-their current configuration and skip the chooser.
+their current configuration and skip the chooser. Use VoiceBridge Settings to
+open the same model selectors again at any time; after confirmation, it stops
+an active voice session before applying the new pair.
 
 ## Configuration
 
@@ -118,7 +127,7 @@ The first run creates `config.toml`. Codex and direct development use
 The supported settings are:
 
 ```toml
-config_version = 2
+config_version = 3
 
 [tts]
 provider = "qwen"
@@ -129,7 +138,7 @@ speed = 1.0
 [stt]
 provider = "whisper"
 model = "mlx-community/whisper-small.en-asr-fp16"
-silence_ms = 2000
+silence_ms = 1000
 max_listen_ms = 30000
 
 [audio]
@@ -141,6 +150,26 @@ Upgrades from the old architecture automatically remove obsolete `[daemon]`
 and `[summarizer]` sections while preserving these speech and audio settings.
 The speech-model libraries keep their normal user caches, so downloaded model
 weights can be reused across hosts.
+
+### Model storage and cleanup
+
+Speech weights are stored in Hugging Face's shared cache at
+`~/.cache/huggingface/hub`, not in VoiceBridge's data directory. Switching a
+model downloads the new choice but deliberately keeps the previous one so
+other local MLX tools can reuse it.
+
+After stopping every VoiceBridge session, inspect the cache and interactively
+remove only model repositories you no longer use:
+
+```bash
+hf cache scan
+hf cache delete --sort size
+```
+
+For example, VoiceBridge's current Qwen and Whisper repositories appear as
+`models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit` and
+`models--mlx-community--whisper-small.en-asr-fp16`. Avoid deleting the whole
+Hugging Face cache: it is shared with other local applications.
 
 Removing the Codex plugin does not delete `~/.voicebridge`. To remove its Codex
 configuration and private Python environment as well, delete that directory

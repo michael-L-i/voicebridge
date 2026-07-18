@@ -1,0 +1,7 @@
+interface:
+  display_name: "VoiceBridge Settings"
+  short_description: "Choose local speech and transcription models"
+  default_prompt: "Use $voice-settings to choose VoiceBridge models."
+
+policy:
+  allow_implicit_invocation: false

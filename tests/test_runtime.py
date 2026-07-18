@@ -193,7 +193,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(first_start["preflight"], _preflight_result())
         self.assertRegex(first_start["version"], r"^(?:\d+\.\d+\.\d+|development)$")
         self.assertEqual(first_start["backend"], "mlx-audio")
-        self.assertEqual(first_start["capture"]["silence_ms"], 2000)
+        self.assertEqual(first_start["capture"]["silence_ms"], 1000)
         self.assertEqual(first_start["capture"]["timeout_ms"], 30000)
         self.assertTrue(second_start["already_ready"])
         self.assertFalse(second_start["first_run"])
@@ -211,7 +211,15 @@ class VoiceRuntimeTests(unittest.TestCase):
         self._mlx_core.clear_cache.assert_called_once()
 
     def test_listen_after_opens_mic_as_soon_as_playback_finishes(self):
-        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+        stt = _FakeSTT()
+        transcribe_threads = []
+
+        def transcribe(audio):
+            transcribe_threads.append(threading.current_thread().name)
+            return "heard"
+
+        stt.transcribe = transcribe
+        registry = _fake_registry(_FakeTTS(), stt)
         playback_waiting = threading.Event()
         playback_finished = threading.Event()
         capture_started = threading.Event()
@@ -266,6 +274,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertTrue(spoken["listen_queued"])
         self.assertEqual(heard["transcript"], "heard")
         self.assertTrue(heard["capture_queued"])
+        self.assertEqual(transcribe_threads, [threading.current_thread().name])
 
     def test_listen_uses_config_timing_unless_overridden(self):
         tts = _FakeTTS()
