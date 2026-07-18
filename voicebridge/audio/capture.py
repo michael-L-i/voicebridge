@@ -11,14 +11,21 @@ import webrtcvad
 from voicebridge.audio.playback import audio_lock, play_chime_end, play_chime_start
 
 # WebRTC VAD only accepts exactly 10, 20, or 30 ms frames.
+# Speech onset is gated by a stricter classifier so room noise cannot start a
+# turn or keep refreshing the no-speech deadline, while active speech keeps the
+# permissive classifier so quiet talkers are not cut off mid-utterance.
 _VAD_AGGRESSIVENESS = 1
+_VAD_ONSET_AGGRESSIVENESS = 2
 _CHUNK_MS = 30
 _MIN_SPEECH_MS = 500
 _PRE_ROLL_MS = 300
 # PortAudio still needs a brief stabilization window after opening the input,
 # but the start chime has already given the output device time to wake up.
 _SETTLE_MS = 100
-_SPEECH_START_CHUNKS = 2
+# Frames of uninterrupted speech that count as the user actually talking, used
+# for onset, for resetting the silence countdown, and for refreshing the
+# deadline. A single misclassified noise frame does none of those.
+_SPEECH_CONFIRM_CHUNKS = 2
 _QUEUE_POLL_S = 0.1
 _DEVICE_STALL_S = 2.0
 
@@ -53,7 +60,7 @@ def _device_arg(device: str | int | None) -> str | int | None:
 
 def listen(
     sample_rate: int,
-    silence_ms: int = 800,
+    silence_ms: int = 1000,
     max_listen_ms: int = 30000,
     *,
     input_device: str | int | None = None,
@@ -65,7 +72,7 @@ def listen(
 
     The returned end reason distinguishes a natural pause, the overall
     no-speech deadline, and an audio-device failure. The deadline is refreshed
-    whenever speech is detected so it cannot cut off someone who is talking.
+    on confirmed runs of speech so it cannot cut off someone who is talking.
     Chime controls let a caller combine several candidate captures into one
     user-visible listening attempt.
     """
@@ -83,6 +90,7 @@ def listen(
     silence_chunks_needed = max(1, round(silence_ms / _CHUNK_MS))
 
     vad = webrtcvad.Vad(_VAD_AGGRESSIVENESS)
+    onset_vad = webrtcvad.Vad(_VAD_ONSET_AGGRESSIVENESS)
     audio_queue: queue.Queue[np.ndarray | _DeviceError] = queue.Queue()
 
     def callback(indata, frames, time_info, status):
@@ -148,20 +156,22 @@ def listen(
                     last_audio_at = time.monotonic()
 
                     pcm16 = (np.clip(item, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+                    frame_vad = vad if speech_detected else onset_vad
                     try:
-                        is_speech = vad.is_speech(pcm16, sample_rate)
+                        is_speech = frame_vad.is_speech(pcm16, sample_rate)
                     except Exception:
                         # Preserve audio on a classifier hiccup instead of
                         # silently dropping something the user may have said.
                         is_speech = True
 
-                    if is_speech:
+                    consecutive_speech = consecutive_speech + 1 if is_speech else 0
+                    confirmed_speech = consecutive_speech >= _SPEECH_CONFIRM_CHUNKS
+                    if confirmed_speech:
                         deadline = time.monotonic() + (max_listen_ms / 1000)
 
                     if not speech_detected:
                         pre_roll.append(item)
-                        consecutive_speech = consecutive_speech + 1 if is_speech else 0
-                        if consecutive_speech >= _SPEECH_START_CHUNKS:
+                        if confirmed_speech:
                             speech_detected = True
                             chunks.extend(pre_roll)
                             pre_roll.clear()
@@ -169,7 +179,10 @@ def listen(
 
                     chunks.append(item)
                     captured_after_start += 1
-                    consecutive_silence = 0 if is_speech else consecutive_silence + 1
+                    if confirmed_speech:
+                        consecutive_silence = 0
+                    elif not is_speech:
+                        consecutive_silence += 1
                     if (
                         captured_after_start >= min_speech_chunks
                         and consecutive_silence >= silence_chunks_needed

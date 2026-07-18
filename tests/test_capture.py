@@ -71,6 +71,74 @@ class ListenTests(unittest.TestCase):
         self.assertTrue(result.speech_detected)
         self.assertEqual(result.audio.size, 6 * frame.size)
 
+    def test_noise_blip_does_not_reset_silence_countdown(self):
+        frame = np.zeros(480, dtype=np.float32)
+        blocks = [frame] * 7
+        decisions = [True, True, False, False, True, False]
+
+        result = self._listen(
+            blocks,
+            decisions,
+            silence_ms=90,
+            max_listen_ms=1000,
+        )
+
+        self.assertEqual(result.end_reason, "silence")
+        self.assertTrue(result.speech_detected)
+        self.assertEqual(result.audio.size, 6 * frame.size)
+
+    def test_resumed_speech_resets_silence_countdown(self):
+        frame = np.zeros(480, dtype=np.float32)
+        blocks = [frame] * 10
+        decisions = [True, True, False, False, True, True, False, False, False]
+
+        result = self._listen(
+            blocks,
+            decisions,
+            silence_ms=90,
+            max_listen_ms=1000,
+        )
+
+        self.assertEqual(result.end_reason, "silence")
+        self.assertEqual(result.audio.size, 9 * frame.size)
+
+    def test_onset_and_endpointing_use_separate_classifiers(self):
+        class _RecordingVad:
+            def __init__(self, decisions):
+                self._decisions = iter(decisions)
+                self.calls = 0
+
+            def is_speech(self, pcm16, sample_rate):
+                self.calls += 1
+                return next(self._decisions)
+
+        frame = np.zeros(480, dtype=np.float32)
+        blocks = [frame] * 6
+        onset = _RecordingVad([False, True, True])
+        endpoint = _RecordingVad([False, False])
+        vads = {
+            capture._VAD_ONSET_AGGRESSIVENESS: onset,
+            capture._VAD_AGGRESSIVENESS: endpoint,
+        }
+
+        stream = lambda **stream_kwargs: _FakeInputStream(
+            blocks=blocks, **stream_kwargs
+        )
+        with (
+            patch.object(capture.sd, "InputStream", stream),
+            patch.object(capture, "play_chime_start"),
+            patch.object(capture, "play_chime_end"),
+            patch.object(capture.webrtcvad, "Vad", side_effect=lambda agg: vads[agg]),
+            patch.object(capture, "_SETTLE_MS", 30),
+            patch.object(capture, "_MIN_SPEECH_MS", 60),
+            patch.object(capture, "_PRE_ROLL_MS", 120),
+        ):
+            result = capture.listen(16000, silence_ms=60, max_listen_ms=1000)
+
+        self.assertEqual(result.end_reason, "silence")
+        self.assertEqual(onset.calls, 3)
+        self.assertEqual(endpoint.calls, 2)
+
     def test_empty_device_callback_obeys_wall_clock_timeout(self):
         started_at = time.monotonic()
         result = self._listen(
