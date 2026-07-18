@@ -127,7 +127,7 @@ The first run creates `config.toml`. Codex and direct development use
 The supported settings are:
 
 ```toml
-config_version = 2
+config_version = 3
 
 [tts]
 provider = "qwen"
@@ -138,7 +138,7 @@ speed = 1.0
 [stt]
 provider = "whisper"
 model = "mlx-community/whisper-small.en-asr-fp16"
-silence_ms = 2000
+silence_ms = 1000
 max_listen_ms = 30000
 
 [audio]

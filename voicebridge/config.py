@@ -16,12 +16,13 @@ CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"
 _SECTION_HEADER = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
 _LEGACY_SECTIONS = {"daemon", "summarizer"}
-_CURRENT_CONFIG_VERSION = 2
-_OLD_DEFAULT_SILENCE_MS = 800
-_DEFAULT_SILENCE_MS = 2000
-_SILENCE_SETTING = re.compile(
-    rf"^(\s*silence_ms\s*=\s*){_OLD_DEFAULT_SILENCE_MS}(\s*(?:#.*)?)$"
-)
+_CURRENT_CONFIG_VERSION = 3
+_DEFAULT_SILENCE_MS = 1000
+# silence_ms defaults shipped by earlier config versions. A stored value is
+# migrated only when it still equals the default of its own version, so a
+# user-chosen value survives the upgrade.
+_OLD_SILENCE_DEFAULTS = {1: 800, 2: 2000}
+_VERSION_SETTING = re.compile(r"^\s*config_version\s*=\s*\d+\s*(?:#.*)?$")
 
 
 class TTSConfig(BaseModel):
@@ -64,9 +65,16 @@ def _migrate_config(path: Path) -> None:
     original = path.read_text(encoding="utf-8")
     parsed = tomllib.loads(original)
     version = int(parsed.get("config_version", 1))
+    old_silence_default = _OLD_SILENCE_DEFAULTS.get(version)
+    silence_setting = (
+        re.compile(rf"^(\s*silence_ms\s*=\s*){old_silence_default}(\s*(?:#.*)?)$")
+        if old_silence_default is not None
+        else None
+    )
     kept_lines = []
     in_legacy_section = False
     current_section = None
+    version_line_seen = False
 
     for line in original.splitlines(keepends=True):
         newline = (
@@ -81,8 +89,11 @@ def _migrate_config(path: Path) -> None:
         if header:
             current_section = header.group(1).strip()
             in_legacy_section = current_section in _LEGACY_SECTIONS
-        elif version < 2 and current_section == "stt":
-            content = _SILENCE_SETTING.sub(
+        elif current_section is None and _VERSION_SETTING.match(content):
+            version_line_seen = True
+            line = f"config_version = {_CURRENT_CONFIG_VERSION}{newline}"
+        elif silence_setting is not None and current_section == "stt":
+            content = silence_setting.sub(
                 rf"\g<1>{_DEFAULT_SILENCE_MS}\g<2>", content
             )
             line = content + newline
@@ -90,7 +101,7 @@ def _migrate_config(path: Path) -> None:
             kept_lines.append(line)
 
     cleaned = "".join(kept_lines).lstrip("\r\n")
-    if version < _CURRENT_CONFIG_VERSION:
+    if version < _CURRENT_CONFIG_VERSION and not version_line_seen:
         cleaned = f"config_version = {_CURRENT_CONFIG_VERSION}\n\n{cleaned}"
     if cleaned == original:
         return

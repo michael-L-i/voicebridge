@@ -124,7 +124,7 @@ output_device = "default"
         self.assertNotIn("[daemon]", migrated)
         self.assertNotIn("[summarizer]", migrated)
         self.assertNotIn("Qwen", migrated)
-        self.assertIn("config_version = 2", migrated)
+        self.assertIn("config_version = 3", migrated)
         self.assertIn('model = "custom-kokoro"', migrated)
         self.assertIn('model = "custom-parakeet"', migrated)
         self.assertEqual(loaded.tts.model, "custom-kokoro")
@@ -150,13 +150,58 @@ max_listen_ms = 30000
                 first_load = config_module.load_config()
                 migrated = config_path.read_text(encoding="utf-8")
                 config_path.write_text(
-                    migrated.replace("silence_ms = 2000", "silence_ms = 800"),
+                    migrated.replace("silence_ms = 1000", "silence_ms = 800"),
                     encoding="utf-8",
                 )
                 second_load = config_module.load_config()
 
-        self.assertEqual(first_load.stt.silence_ms, 2000)
+        self.assertEqual(first_load.stt.silence_ms, 1000)
         self.assertEqual(second_load.stt.silence_ms, 800)
+
+    def test_v2_default_silence_is_lowered_without_duplicating_version(self):
+        old_config = """\
+config_version = 2
+
+[stt]
+silence_ms = 2000
+max_listen_ms = 30000
+"""
+
+        with tempfile.TemporaryDirectory() as data_dir:
+            config_path = Path(data_dir) / "config.toml"
+            config_path.write_text(old_config, encoding="utf-8")
+            with (
+                patch.object(config_module, "CONFIG_DIR", Path(data_dir)),
+                patch.object(config_module, "CONFIG_PATH", config_path),
+            ):
+                loaded = config_module.load_config()
+            migrated = config_path.read_text(encoding="utf-8")
+
+        self.assertEqual(loaded.stt.silence_ms, 1000)
+        self.assertEqual(migrated.count("config_version"), 1)
+        self.assertIn("config_version = 3", migrated)
+
+    def test_v2_customized_silence_survives_migration(self):
+        old_config = """\
+config_version = 2
+
+[stt]
+silence_ms = 2500
+max_listen_ms = 30000
+"""
+
+        with tempfile.TemporaryDirectory() as data_dir:
+            config_path = Path(data_dir) / "config.toml"
+            config_path.write_text(old_config, encoding="utf-8")
+            with (
+                patch.object(config_module, "CONFIG_DIR", Path(data_dir)),
+                patch.object(config_module, "CONFIG_PATH", config_path),
+            ):
+                loaded = config_module.load_config()
+            migrated = config_path.read_text(encoding="utf-8")
+
+        self.assertEqual(loaded.stt.silence_ms, 2500)
+        self.assertIn("config_version = 3", migrated)
 
 
 if __name__ == "__main__":

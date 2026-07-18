@@ -193,7 +193,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(first_start["preflight"], _preflight_result())
         self.assertRegex(first_start["version"], r"^(?:\d+\.\d+\.\d+|development)$")
         self.assertEqual(first_start["backend"], "mlx-audio")
-        self.assertEqual(first_start["capture"]["silence_ms"], 2000)
+        self.assertEqual(first_start["capture"]["silence_ms"], 1000)
         self.assertEqual(first_start["capture"]["timeout_ms"], 30000)
         self.assertTrue(second_start["already_ready"])
         self.assertFalse(second_start["first_run"])
