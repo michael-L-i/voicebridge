@@ -15,13 +15,52 @@ concurrency:
 
 jobs:
   test:
-    name: Test (Python ${{ matrix.python }})
-    runs-on: macos-14
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.macos }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11", "3.13"]
+        include:
+          # Preserve the names of the two existing required checks while this
+          # PR expands the matrix. The aggregate gate below becomes required
+          # after this PR lands.
+          - macos: "macos-14"
+            python: "3.11"
+            name: "Python 3.11"
+          - macos: "macos-14"
+            python: "3.13"
+            name: "Python 3.13"
+          - macos: "macos-14"
+            python: "3.12"
+            name: "macOS 14, Python 3.12"
+          - macos: "macos-14"
+            python: "3.14"
+            name: "macOS 14, Python 3.14"
+          - macos: "macos-15"
+            python: "3.11"
+            name: "macOS 15, Python 3.11"
+          - macos: "macos-15"
+            python: "3.12"
+            name: "macOS 15, Python 3.12"
+          - macos: "macos-15"
+            python: "3.13"
+            name: "macOS 15, Python 3.13"
+          - macos: "macos-15"
+            python: "3.14"
+            name: "macOS 15, Python 3.14"
+          - macos: "macos-26"
+            python: "3.11"
+            name: "macOS 26, Python 3.11"
+          - macos: "macos-26"
+            python: "3.12"
+            name: "macOS 26, Python 3.12"
+          - macos: "macos-26"
+            python: "3.13"
+            name: "macOS 26, Python 3.13"
+          - macos: "macos-26"
+            python: "3.14"
+            name: "macOS 26, Python 3.14"
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -51,11 +90,33 @@ jobs:
       - name: Run unit tests
         run: uv run --locked --python "${{ matrix.python }}" python -m unittest discover -s tests -v
 
+  package:
+    name: Package artifacts
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check "uv==0.7.11"
+
+      - name: Verify the lockfile
+        run: uv lock --check
+
+      - name: Install the locked environment
+        run: uv sync --locked --python "3.14"
+
       - name: Build and inspect package artifacts
         run: |
           artifact_dir="$(mktemp -d)"
           uv build --out-dir "$artifact_dir"
-          uv run --locked --python "${{ matrix.python }}" python scripts/verify_distribution.py "$artifact_dir"
+          uv run --locked --python "3.14" python scripts/verify_distribution.py "$artifact_dir"
 
   dependency-review:
     name: Dependency review
@@ -67,3 +128,26 @@ jobs:
     steps:
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
+  complete:
+    name: CI complete
+    needs: [test, package, dependency-review]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$PACKAGE_RESULT" = success
+          case "$DEPENDENCY_REVIEW_RESULT" in
+            success|skipped) ;;
+            *)
+              echo "Dependency review did not pass: $DEPENDENCY_REVIEW_RESULT" >&2
+              exit 1
+              ;;
+          esac

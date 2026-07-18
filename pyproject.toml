@@ -27,6 +27,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
 dependencies = [
@@ -41,7 +42,9 @@ dependencies = [
   # (EspeakWrapper.set_data_path) -- plain `phonemizer` (no "-fork") lacks
   # that method and fails at import time.
   "misaki",
-  "spacy",
+  # spaCy 3.8.14 omitted CPython 3.14 macOS ARM wheels. Keep the Python 3.14
+  # compatible 3.8.9-3.8.13 range until upstream publishes a fixed release.
+  "spacy>=3.8.9,<3.8.14",
   "num2words",
   "phonemizer-fork",
   "espeakng-loader",

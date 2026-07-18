@@ -23,8 +23,8 @@ direction is explicitly changed first.
 
 ## Development setup
 
-Development requires an Apple Silicon Mac and Python 3.11 or newer. From the
-repository root:
+Development requires an Apple Silicon Mac running macOS 14 or newer and Python
+3.11 through 3.14. From the repository root:
 
 ```bash
 uv sync --locked --python 3.13

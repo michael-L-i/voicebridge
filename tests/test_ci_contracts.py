@@ -12,8 +12,13 @@ class CiContractTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
         self.assertIn("pull_request:", workflow)
-        self.assertIn("runs-on: macos-14", workflow)
-        self.assertIn('python: ["3.11", "3.13"]', workflow)
+        for macos in ("macos-14", "macos-15", "macos-26"):
+            self.assertIn(f'macos: "{macos}"', workflow)
+        for python in ("3.11", "3.12", "3.13", "3.14"):
+            self.assertIn(f'python: "{python}"', workflow)
+        self.assertIn("runs-on: ${{ matrix.macos }}", workflow)
+        self.assertIn("name: CI complete", workflow)
+        self.assertIn("needs: [test, package, dependency-review]", workflow)
         self.assertIn("uv lock --check", workflow)
         self.assertIn("uv sync --locked", workflow)
         self.assertIn("import mlx.core as mx", workflow)
@@ -29,6 +34,8 @@ class CiContractTests(unittest.TestCase):
 
         self.assertIn("release:", workflow)
         self.assertIn("types: [published]", workflow)
+        self.assertIn('macos: ["macos-14", "macos-15", "macos-26"]', workflow)
+        self.assertIn('python: ["3.11", "3.12", "3.13", "3.14"]', workflow)
         self.assertIn("Verify the release tag matches the package version", workflow)
         self.assertIn("uv build --out-dir", workflow)
         self.assertNotIn("twine upload", workflow)
