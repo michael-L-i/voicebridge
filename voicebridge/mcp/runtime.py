@@ -3,6 +3,7 @@ import gc
 import os
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,10 +25,18 @@ class VoiceSessionBusy(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class _QueuedCapture:
+    result: Any
+    started_at: float
+    timeout_ms: int
+    silence_ms: int
+
+
 class _QueuedListen:
-    def __init__(self, target: Callable[[], dict]) -> None:
+    def __init__(self, target: Callable[[], Any]) -> None:
         self._target = target
-        self._result: dict | None = None
+        self._result: Any = None
         self._error: Exception | None = None
         self._thread = threading.Thread(
             target=self._run,
@@ -44,7 +53,7 @@ class _QueuedListen:
         except Exception as exc:
             self._error = exc
 
-    def wait(self) -> dict:
+    def wait(self) -> Any:
         self._thread.join()
         if self._error is not None:
             raise self._error
@@ -147,7 +156,7 @@ class VoiceRuntime:
                 device=self.config.audio.output_device,
             )
             if listen_after:
-                queued_listen = _QueuedListen(self._run_queued_listen)
+                queued_listen = _QueuedListen(self._run_queued_capture)
                 with self._queued_listen_lock:
                     self._queued_listen = queued_listen
                 queued_listen.start()
@@ -170,7 +179,16 @@ class VoiceRuntime:
             queued_listen = self._queued_listen
             self._queued_listen = None
         if queued_listen is not None:
-            return {**queued_listen.wait(), "capture_queued": True}
+            queued_capture = queued_listen.wait()
+            with self._operation_lock:
+                return {
+                    **self._listen_locked(
+                        None,
+                        None,
+                        queued_capture=queued_capture,
+                    ),
+                    "capture_queued": True,
+                }
 
         with self._operation_lock:
             return self._listen_locked(timeout_ms, silence_ms)
@@ -270,14 +288,37 @@ class VoiceRuntime:
         if playback is not None:
             playback.wait()
 
-    def _run_queued_listen(self) -> dict:
+    def _run_queued_capture(self) -> _QueuedCapture:
         with self._operation_lock:
-            return self._listen_locked(None, None)
+            self._ensure_started()
+            self._wait_for_playback()
+            from voicebridge.audio.capture import listen
+
+            timeout_ms = self.config.stt.max_listen_ms
+            silence_ms = self.config.stt.silence_ms
+            started_at = time.monotonic()
+            result = listen(
+                self._stt.sample_rate,
+                silence_ms=silence_ms,
+                max_listen_ms=timeout_ms,
+                input_device=self.config.audio.input_device,
+                output_device=self.config.audio.output_device,
+                start_chime=True,
+                end_chime=False,
+            )
+            return _QueuedCapture(
+                result=result,
+                started_at=started_at,
+                timeout_ms=timeout_ms,
+                silence_ms=silence_ms,
+            )
 
     def _listen_locked(
         self,
         timeout_ms: int | None,
         silence_ms: int | None,
+        *,
+        queued_capture: _QueuedCapture | None = None,
     ) -> dict:
         self._ensure_started()
         self._wait_for_playback()
@@ -285,19 +326,30 @@ class VoiceRuntime:
         from voicebridge.audio.playback import audio_lock, play_chime_end
 
         effective_timeout_ms = (
-            timeout_ms if timeout_ms is not None else self.config.stt.max_listen_ms
+            queued_capture.timeout_ms
+            if queued_capture is not None
+            else timeout_ms
+            if timeout_ms is not None
+            else self.config.stt.max_listen_ms
         )
         effective_silence_ms = (
-            silence_ms if silence_ms is not None else self.config.stt.silence_ms
+            queued_capture.silence_ms
+            if queued_capture is not None
+            else silence_ms
+            if silence_ms is not None
+            else self.config.stt.silence_ms
         )
         if effective_timeout_ms <= 0:
             raise ValueError("timeout_ms must be positive")
         if effective_silence_ms <= 0:
             raise ValueError("silence_ms must be positive")
 
-        started_at = time.monotonic()
+        started_at = (
+            queued_capture.started_at if queued_capture is not None else time.monotonic()
+        )
         deadline = started_at + (effective_timeout_ms / 1000)
         first_attempt = True
+        pending_result = queued_capture.result if queued_capture is not None else None
         transcript = ""
         transcription_s = 0.0
         discarded_empty_segments = 0
@@ -307,19 +359,22 @@ class VoiceRuntime:
 
         try:
             while True:
-                remaining_s = deadline - time.monotonic()
-                if remaining_s <= 0:
-                    break
-
-                result = listen(
-                    self._stt.sample_rate,
-                    silence_ms=effective_silence_ms,
-                    max_listen_ms=max(1, int(remaining_s * 1000)),
-                    input_device=self.config.audio.input_device,
-                    output_device=self.config.audio.output_device,
-                    start_chime=first_attempt,
-                    end_chime=False,
-                )
+                if pending_result is not None:
+                    result = pending_result
+                    pending_result = None
+                else:
+                    remaining_s = deadline - time.monotonic()
+                    if remaining_s <= 0:
+                        break
+                    result = listen(
+                        self._stt.sample_rate,
+                        silence_ms=effective_silence_ms,
+                        max_listen_ms=max(1, int(remaining_s * 1000)),
+                        input_device=self.config.audio.input_device,
+                        output_device=self.config.audio.output_device,
+                        start_chime=first_attempt,
+                        end_chime=False,
+                    )
                 first_attempt = False
                 end_reason = result.end_reason
                 error = result.error
