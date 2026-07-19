@@ -99,7 +99,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(result["current"], result["defaults"])
         self.assertEqual(
             [item["id"] for item in result["tts"]],
-            ["kokoro", "chatterbox", "qwen"],
+            ["pocket", "kokoro", "chatterbox", "qwen"],
         )
         self.assertEqual(
             [item["id"] for item in result["stt"]],

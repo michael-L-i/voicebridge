@@ -29,11 +29,12 @@ the microphone without retaining audio, and loads only the selected models.
 The same model instances are reused between turns, and `voice_stop` releases
 them and clears the MLX cache.
 
-VoiceBridge offers three local options in each direction, ordered by resource
-use:
+VoiceBridge offers several local options in each direction, ordered by
+resource use:
 
 | TTS | Tier | Download |
 | --- | --- | ---: |
+| Pocket TTS 100M | Lightweight | 236 MB |
 | Kokoro 82M | Lightweight | 389 MB |
 | Chatterbox Turbo 350M | Balanced | 417 MB |
 | Qwen 0.6B | Heavy, highest quality | 1.97 GB |

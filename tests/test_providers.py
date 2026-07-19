@@ -7,6 +7,7 @@ import numpy as np
 from voicebridge.config import STTConfig, TTSConfig
 from voicebridge.providers.chatterbox_tts import ChatterboxTTSProvider
 from voicebridge.providers.moonshine_stt import MoonshineSTTProvider
+from voicebridge.providers.pocket_tts import PocketTTSProvider
 from voicebridge.providers.qwen_tts import QwenTTSProvider
 from voicebridge.providers.registry import STT_PROVIDERS, TTS_PROVIDERS
 
@@ -113,6 +114,52 @@ class ChatterboxTTSProviderTests(unittest.TestCase):
 
     def test_is_registered(self):
         self.assertIs(TTS_PROVIDERS["chatterbox"], ChatterboxTTSProvider)
+
+
+class PocketTTSProviderTests(unittest.TestCase):
+    def test_loads_once_and_joins_configured_voice_audio(self):
+        model = Mock()
+        model.generate.return_value = [
+            SimpleNamespace(audio=np.array([0.1, 0.2])),
+            SimpleNamespace(audio=np.array([0.3])),
+        ]
+        config = TTSConfig(
+            provider="pocket",
+            model="mlx-community/pocket-tts",
+            voice="alba",
+        )
+
+        with patch(
+            "voicebridge.providers.pocket_tts.load_model",
+            return_value=model,
+        ) as load_model:
+            provider = PocketTTSProvider(config)
+            self.assertIs(provider.load(), provider)
+            audio = provider.synthesize("Hello there.")
+
+        load_model.assert_called_once_with("mlx-community/pocket-tts")
+        model.generate.assert_called_once_with(text="Hello there.", voice="alba")
+        np.testing.assert_allclose(audio, [0.1, 0.2, 0.3])
+        self.assertEqual(audio.dtype, np.float32)
+        self.assertEqual(provider.sample_rate, 24000)
+
+    def test_voice_override_replaces_configured_voice(self):
+        model = Mock()
+        model.generate.return_value = []
+
+        with patch(
+            "voicebridge.providers.pocket_tts.load_model",
+            return_value=model,
+        ):
+            audio = PocketTTSProvider(TTSConfig(voice="alba")).synthesize(
+                "Use marius.", voice="marius"
+            )
+
+        self.assertEqual(model.generate.call_args.kwargs["voice"], "marius")
+        self.assertEqual(audio.size, 0)
+
+    def test_is_registered(self):
+        self.assertIs(TTS_PROVIDERS["pocket"], PocketTTSProvider)
 
 
 class MoonshineSTTProviderTests(unittest.TestCase):
