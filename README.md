@@ -41,7 +41,7 @@ use:
 | STT | Tier | Download |
 | --- | --- | ---: |
 | Moonshine Base 61M | Lightweight | 248 MB |
-| Whisper Small.en 244M | Balanced | 485 MB |
+| Parakeet 110M | Balanced | 459 MB |
 | Parakeet 0.6B v3 | Heavy, highest accuracy | 2.51 GB |
 
 Some MLX Audio speech implementations reuse `mlx-lm` cache and sampling
@@ -113,7 +113,7 @@ runtime version and capture settings so stale sessions are detected explicitly.
 
 The first start creates a private Python environment. Before any model download,
 Voice Code asks the user to choose one TTS and one STT tier, with Qwen and
-Whisper preselected. It then asks macOS for microphone access and validates
+Parakeet preselected. It then asks macOS for microphone access and validates
 audio before downloading only that pair. Model downloads can take several
 minutes; low disk space is reported as a warning. Existing installations keep
 their current configuration and skip the chooser. Use VoiceBridge Settings to
@@ -136,8 +136,8 @@ voice = "Aiden"
 speed = 1.0
 
 [stt]
-provider = "whisper"
-model = "mlx-community/whisper-small.en-asr-fp16"
+provider = "parakeet"
+model = "mlx-community/parakeet-tdt_ctc-110m"
 silence_ms = 1000
 max_listen_ms = 30000
 
@@ -166,9 +166,9 @@ hf cache scan
 hf cache delete --sort size
 ```
 
-For example, VoiceBridge's current Qwen and Whisper repositories appear as
+For example, VoiceBridge's current Qwen and Parakeet repositories appear as
 `models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit` and
-`models--mlx-community--whisper-small.en-asr-fp16`. Avoid deleting the whole
+`models--mlx-community--parakeet-tdt_ctc-110m`. Avoid deleting the whole
 Hugging Face cache: it is shared with other local applications.
 
 Removing the Codex plugin does not delete `~/.voicebridge`. To remove its Codex
