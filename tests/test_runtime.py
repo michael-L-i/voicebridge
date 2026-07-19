@@ -95,7 +95,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         result = runtime.models()
 
         self.assertFalse(runtime.ready)
-        self.assertEqual(result["defaults"], {"tts": "qwen", "stt": "whisper"})
+        self.assertEqual(result["defaults"], {"tts": "qwen", "stt": "parakeet-110m"})
         self.assertEqual(result["current"], result["defaults"])
         self.assertEqual(
             [item["id"] for item in result["tts"]],
@@ -103,7 +103,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["id"] for item in result["stt"]],
-            ["moonshine", "whisper", "parakeet"],
+            ["moonshine", "parakeet-110m", "parakeet"],
         )
 
     def test_configure_models_persists_selection_without_loading(self):

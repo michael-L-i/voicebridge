@@ -18,7 +18,7 @@ class ModelCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["id"] for item in STT_MODELS],
-            ["moonshine", "whisper", "parakeet"],
+            ["moonshine", "parakeet-110m", "parakeet"],
         )
         self.assertEqual(
             [item["download_mb"] for item in TTS_MODELS],
@@ -33,14 +33,14 @@ class ModelCatalogTests(unittest.TestCase):
         catalog = model_catalog(
             tts_provider="qwen",
             tts_model="mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
-            stt_provider="whisper",
-            stt_model="mlx-community/whisper-small.en-asr-fp16",
+            stt_provider="parakeet",
+            stt_model="mlx-community/parakeet-tdt_ctc-110m",
         )
 
         self.assertEqual(DEFAULT_TTS_MODEL, "qwen")
-        self.assertEqual(DEFAULT_STT_MODEL, "whisper")
+        self.assertEqual(DEFAULT_STT_MODEL, "parakeet-110m")
         self.assertEqual(
-            catalog["defaults"], {"tts": "qwen", "stt": "whisper"}
+            catalog["defaults"], {"tts": "qwen", "stt": "parakeet-110m"}
         )
         self.assertEqual(catalog["current"], catalog["defaults"])
         self.assertTrue(
@@ -49,7 +49,7 @@ class ModelCatalogTests(unittest.TestCase):
             ]
         )
         self.assertTrue(
-            next(item for item in catalog["stt"] if item["id"] == "whisper")[
+            next(item for item in catalog["stt"] if item["id"] == "parakeet-110m")[
                 "default"
             ]
         )

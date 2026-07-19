@@ -28,7 +28,7 @@ Use two distinct outputs for each completed request:
    selectors using Claude Code's structured question UI when available, with a
    numbered conversational fallback. Preserve the lightest-to-heaviest order,
    show each option's tier and download size, and preselect the returned
-   defaults (Qwen TTS and Whisper STT). If the user cancels, end without calling
+   defaults (Qwen TTS and Parakeet 110M STT). If the user cancels, end without calling
    `voice_start`. Otherwise call `voice_configure` with both selected IDs.
    Existing users with `first_run: false` skip this onboarding choice.
 2. Call `voice_start` and wait for the audio preflight and local speech

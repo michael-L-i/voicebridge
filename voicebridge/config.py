@@ -33,8 +33,8 @@ class TTSConfig(BaseModel):
 
 
 class STTConfig(BaseModel):
-    provider: str = "whisper"
-    model: str = "mlx-community/whisper-small.en-asr-fp16"
+    provider: str = "parakeet"
+    model: str = "mlx-community/parakeet-tdt_ctc-110m"
     silence_ms: int = _DEFAULT_SILENCE_MS
     max_listen_ms: int = 30000
 

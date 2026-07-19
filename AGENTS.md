@@ -83,7 +83,7 @@ through the host's plugin mechanism; there is no manual MCP configuration.
 - `voicebridge/providers/`: STT/TTS provider abstractions
   (`TTSProvider`/`STTProvider`) and a plain-dict registry keyed by config
   string. TTS providers are Kokoro, Chatterbox Turbo, and Qwen 0.6B; STT
-  providers are Moonshine Base, Whisper Small, and Parakeet 0.6B.
+  providers are Moonshine Base, Parakeet 110M, and Parakeet 0.6B.
 - `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_models`,
   `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`, `voice_stop`,
   and `voice_status`.

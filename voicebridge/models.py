@@ -46,14 +46,14 @@ STT_MODELS = (
         "description": "Very light, low-latency English transcription.",
     },
     {
-        "id": "whisper",
-        "label": "Whisper Small.en 244M",
+        "id": "parakeet-110m",
+        "label": "Parakeet 110M",
         "tier": "balanced",
-        "parameters_millions": 244,
-        "download_mb": 485,
-        "provider": "whisper",
-        "model": "mlx-community/whisper-small.en-asr-fp16",
-        "description": "Robust English transcription with balanced resource use.",
+        "parameters_millions": 114,
+        "download_mb": 459,
+        "provider": "parakeet",
+        "model": "mlx-community/parakeet-tdt_ctc-110m",
+        "description": "Accurate, noise-robust English transcription with balanced resource use.",
     },
     {
         "id": "parakeet",
@@ -68,7 +68,7 @@ STT_MODELS = (
 )
 
 DEFAULT_TTS_MODEL = "qwen"
-DEFAULT_STT_MODEL = "whisper"
+DEFAULT_STT_MODEL = "parakeet-110m"
 
 
 def get_model_option(kind: str, option_id: str) -> dict:

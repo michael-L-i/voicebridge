@@ -7,8 +7,8 @@ voice = "Aiden"
 speed = 1.0
 
 [stt]
-provider = "whisper"
-model = "mlx-community/whisper-small.en-asr-fp16"
+provider = "parakeet"
+model = "mlx-community/parakeet-tdt_ctc-110m"
 silence_ms = 1000
 max_listen_ms = 30000
 

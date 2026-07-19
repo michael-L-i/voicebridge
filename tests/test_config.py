@@ -7,7 +7,7 @@ from voicebridge import config as config_module
 
 
 class ConfigMigrationTests(unittest.TestCase):
-    def test_new_config_defaults_to_qwen_and_whisper(self):
+    def test_new_config_defaults_to_qwen_and_parakeet(self):
         with tempfile.TemporaryDirectory() as data_dir:
             config_path = Path(data_dir) / "config.toml"
             with (
@@ -22,9 +22,9 @@ class ConfigMigrationTests(unittest.TestCase):
             "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
         )
         self.assertEqual(loaded.tts.voice, "Aiden")
-        self.assertEqual(loaded.stt.provider, "whisper")
+        self.assertEqual(loaded.stt.provider, "parakeet")
         self.assertEqual(
-            loaded.stt.model, "mlx-community/whisper-small.en-asr-fp16"
+            loaded.stt.model, "mlx-community/parakeet-tdt_ctc-110m"
         )
 
     def test_model_selection_preserves_existing_settings_and_unknown_sections(self):
