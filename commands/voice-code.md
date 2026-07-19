@@ -26,9 +26,11 @@ Use two distinct outputs for each completed request:
 1. Call `voice_status`. If `first_run` is true, call `voice_models` before any
    audio tool or model download. Present separate TTS and STT single-choice
    selectors using Claude Code's structured question UI when available, with a
-   numbered conversational fallback. Preserve the lightest-to-heaviest order,
-   show each option's tier and download size, and preselect the returned
-   defaults (Qwen TTS and Parakeet 110M STT). If the user cancels, end without calling
+   numbered conversational fallback. The structured UI starts on the first
+   listed option, so list the returned default first in each selector (Qwen
+   TTS and Parakeet 110M STT) with "(Recommended)" appended to its label, then
+   the remaining options lightest to heaviest. Show each option's tier and
+   download size. If the user cancels, end without calling
    `voice_start`. Otherwise call `voice_configure` with both selected IDs.
    Existing users with `first_run: false` skip this onboarding choice.
 2. Call `voice_start` and wait for the audio preflight and local speech

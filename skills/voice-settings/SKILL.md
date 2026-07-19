@@ -16,11 +16,13 @@ start a voice conversation or use the microphone.
    user confirms, call `mcp__voicebridge__voice_stop`; otherwise end without
    changing settings.
 3. Call `mcp__voicebridge__voice_models`. Present separate TTS and STT
-   single-choice selectors using Codex's structured question UI. Keep the
-   returned lightest-to-heaviest order and show every option's tier, download
-   size, and short description. Preselect `current.tts` and `current.stt`; when
-   an existing custom model is not in the catalog, preselect the matching
-   first-run `defaults` entry.
+   single-choice selectors using Codex's structured question UI. The
+   structured UI starts on the first listed option, so list `current.tts` and
+   `current.stt` first with "(Current)" appended to their labels — or the
+   matching first-run `defaults` entry when an existing custom model is not in
+   the catalog — then the remaining options lightest to heaviest, appending
+   "(Recommended)" to the `defaults` entry when it is not the current one.
+   Show every option's tier, download size, and short description.
 4. If the user cancels either selector, end without changing settings.
    Otherwise call `mcp__voicebridge__voice_configure` with both chosen IDs.
 5. Confirm the selected labels and say the models download when the next
