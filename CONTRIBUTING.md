@@ -36,9 +36,18 @@ uv run --locked voicebridge doctor
 The first real voice session can download several speech-model files. Unit
 tests do not load the models or access the microphone.
 
-`uv.lock` is the committed development and CI dependency set. Run
-`uv lock --check` before opening a pull request; change the lockfile only when
-you intentionally change the dependency declaration.
+`uv.lock` is the source of truth for development, CI, and production runtime
+dependencies. The plugin bootstrap installs the hashed `requirements.lock`
+export so user environments resolve the same versions. After an intentional
+lockfile change, regenerate that export with:
+
+```bash
+uv export --locked --no-dev --no-emit-project --no-annotate --no-header \
+  --output-file requirements.lock
+```
+
+Run `uv lock --check` before opening a pull request. CI also verifies that the
+committed export still exactly matches `uv.lock`.
 
 To inspect the checkout's MCP tools without installing either host plugin, run:
 
