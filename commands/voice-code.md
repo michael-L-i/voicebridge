@@ -32,7 +32,8 @@ Use two distinct outputs for each completed request:
    the remaining options lightest to heaviest. Show each option's tier and
    download size. If the user cancels, end without calling
    `voice_start`. Otherwise call `voice_configure` with both selected IDs.
-   Existing users with `first_run: false` skip this onboarding choice.
+   Existing users with `first_run: false` skip this onboarding choice silently:
+   say nothing about the check or the skip, and proceed straight to step 2.
 2. Call `voice_start` and wait for the audio preflight and local speech
    models to load. If it returns `ok: false`, show the error to the user and end
    without retrying. A current runtime returns `version`, `host`, `capture`, and
@@ -41,10 +42,11 @@ Use two distinct outputs for each completed request:
    `voice_stop`, tell the user to fully exit every Claude Code session using
    VoiceBridge and relaunch Claude Code, then end without starting a voice loop.
 3. Once ready, call `voice_speak` with `listen_after: true` and a brief, casual
-   one-sentence greeting, then call `voice_listen` immediately. VoiceBridge
-   opens the mic as soon as playback finishes and the listen call collects that
-   queued capture. Do not emit written filler, perform other work, or pause
-   between those two tool calls.
+   one-sentence greeting, then call `voice_listen` immediately. If `first_run`
+   was true, make this greeting a short welcome to VoiceBridge; otherwise use
+   an ordinary casual greeting. VoiceBridge opens the mic as soon as playback
+   finishes and the listen call collects that queued capture. Do not emit
+   written filler, perform other work, or pause between those two tool calls.
 4. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Act on it with your normal tools.
 5. For a request likely to take noticeable time, acknowledge it first with one
