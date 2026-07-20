@@ -85,7 +85,7 @@ def voice_listen(
 ) -> dict:
     """Listen via microphone and return the user's transcribed instruction.
 
-    Capture ends after the configured pause (two seconds by default) or overall
+    Capture ends after the configured pause (one second by default) or overall
     timeout. If the preceding voice_speak queued capture, this collects that
     already-running listen and its configured timing; otherwise optional
     arguments override config for this call. Noise segments that transcribe to

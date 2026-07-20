@@ -113,7 +113,7 @@ runtime version and capture settings so stale sessions are detected explicitly.
 ## First run
 
 The first start creates a private Python environment. Before any model download,
-Voice Code asks the user to choose one TTS and one STT tier, with Qwen and
+Voice Code asks the user to choose one TTS and one STT tier, with Pocket and
 Parakeet preselected. It then asks macOS for microphone access and validates
 audio before downloading only that pair. Model downloads can take several
 minutes; low disk space is reported as a warning. Existing installations keep
