@@ -31,20 +31,20 @@ class ModelCatalogTests(unittest.TestCase):
 
     def test_defaults_and_current_selection_are_reported(self):
         catalog = model_catalog(
-            tts_provider="qwen",
-            tts_model="mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
+            tts_provider="pocket",
+            tts_model="mlx-community/pocket-tts",
             stt_provider="parakeet",
             stt_model="mlx-community/parakeet-tdt_ctc-110m",
         )
 
-        self.assertEqual(DEFAULT_TTS_MODEL, "qwen")
+        self.assertEqual(DEFAULT_TTS_MODEL, "pocket")
         self.assertEqual(DEFAULT_STT_MODEL, "parakeet-110m")
         self.assertEqual(
-            catalog["defaults"], {"tts": "qwen", "stt": "parakeet-110m"}
+            catalog["defaults"], {"tts": "pocket", "stt": "parakeet-110m"}
         )
         self.assertEqual(catalog["current"], catalog["defaults"])
         self.assertTrue(
-            next(item for item in catalog["tts"] if item["id"] == "qwen")[
+            next(item for item in catalog["tts"] if item["id"] == "pocket")[
                 "default"
             ]
         )

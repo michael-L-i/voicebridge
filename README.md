@@ -131,9 +131,9 @@ The supported settings are:
 config_version = 3
 
 [tts]
-provider = "qwen"
-model = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
-voice = "Aiden"
+provider = "pocket"
+model = "mlx-community/pocket-tts"
+voice = "alba"
 speed = 1.0
 
 [stt]

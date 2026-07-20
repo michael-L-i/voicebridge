@@ -7,7 +7,7 @@ from voicebridge import config as config_module
 
 
 class ConfigMigrationTests(unittest.TestCase):
-    def test_new_config_defaults_to_qwen_and_parakeet(self):
+    def test_new_config_defaults_to_pocket_and_parakeet(self):
         with tempfile.TemporaryDirectory() as data_dir:
             config_path = Path(data_dir) / "config.toml"
             with (
@@ -16,12 +16,12 @@ class ConfigMigrationTests(unittest.TestCase):
             ):
                 loaded = config_module.load_config()
 
-        self.assertEqual(loaded.tts.provider, "qwen")
+        self.assertEqual(loaded.tts.provider, "pocket")
         self.assertEqual(
             loaded.tts.model,
-            "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
+            "mlx-community/pocket-tts",
         )
-        self.assertEqual(loaded.tts.voice, "Aiden")
+        self.assertEqual(loaded.tts.voice, "alba")
         self.assertEqual(loaded.stt.provider, "parakeet")
         self.assertEqual(
             loaded.stt.model, "mlx-community/parakeet-tdt_ctc-110m"

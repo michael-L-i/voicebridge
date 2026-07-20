@@ -27,7 +27,7 @@ Use two distinct outputs for each completed request:
    audio tool or model download. Present separate TTS and STT single-choice
    selectors using Claude Code's structured question UI when available, with a
    numbered conversational fallback. The structured UI starts on the first
-   listed option, so list the returned default first in each selector (Qwen
+   listed option, so list the returned default first in each selector (Pocket
    TTS and Parakeet 110M STT) with "(Recommended)" appended to its label, then
    the remaining options lightest to heaviest. Show each option's tier and
    download size. If the user cancels, end without calling

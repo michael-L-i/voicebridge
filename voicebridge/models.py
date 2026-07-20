@@ -78,7 +78,7 @@ STT_MODELS = (
     },
 )
 
-DEFAULT_TTS_MODEL = "qwen"
+DEFAULT_TTS_MODEL = "pocket"
 DEFAULT_STT_MODEL = "parakeet-110m"
 
 

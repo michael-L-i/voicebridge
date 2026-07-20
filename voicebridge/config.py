@@ -26,9 +26,9 @@ _VERSION_SETTING = re.compile(r"^\s*config_version\s*=\s*\d+\s*(?:#.*)?$")
 
 
 class TTSConfig(BaseModel):
-    provider: str = "qwen"
-    model: str = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
-    voice: str = "Aiden"
+    provider: str = "pocket"
+    model: str = "mlx-community/pocket-tts"
+    voice: str = "alba"
     speed: float = 1.0
 
 

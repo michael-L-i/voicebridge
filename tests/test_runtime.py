@@ -95,7 +95,7 @@ class VoiceRuntimeTests(unittest.TestCase):
         result = runtime.models()
 
         self.assertFalse(runtime.ready)
-        self.assertEqual(result["defaults"], {"tts": "qwen", "stt": "parakeet-110m"})
+        self.assertEqual(result["defaults"], {"tts": "pocket", "stt": "parakeet-110m"})
         self.assertEqual(result["current"], result["defaults"])
         self.assertEqual(
             [item["id"] for item in result["tts"]],
