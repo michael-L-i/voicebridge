@@ -14,7 +14,7 @@ class ModelCatalogTests(unittest.TestCase):
     def test_options_are_ordered_from_lightest_to_heaviest(self):
         self.assertEqual(
             [item["id"] for item in TTS_MODELS],
-            ["kokoro", "chatterbox", "qwen"],
+            ["pocket", "kokoro", "chatterbox", "qwen"],
         )
         self.assertEqual(
             [item["id"] for item in STT_MODELS],

@@ -1,5 +1,16 @@
 TTS_MODELS = (
     {
+        "id": "pocket",
+        "label": "Pocket TTS 100M",
+        "tier": "lightweight",
+        "parameters_millions": 100,
+        "download_mb": 236,
+        "provider": "pocket",
+        "model": "mlx-community/pocket-tts",
+        "voice": "alba",
+        "description": "Kyutai's CPU-optimized voice with streaming and voice cloning.",
+    },
+    {
         "id": "kokoro",
         "label": "Kokoro 82M",
         "tier": "lightweight",
