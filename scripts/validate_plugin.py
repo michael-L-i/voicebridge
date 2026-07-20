@@ -45,6 +45,7 @@ def main() -> int:
         "commands/voice-code.md",
         "commands/voice-settings.md",
         "config/default_config.toml",
+        "requirements.lock",
         "skills/voice-code/SKILL.md",
         "skills/voice-code/agents/openai.yaml",
         "skills/voice-settings/SKILL.md",
