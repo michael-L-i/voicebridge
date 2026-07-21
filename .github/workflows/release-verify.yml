@@ -30,12 +30,12 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Check out release source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.release.tag_name || inputs.ref }}
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ matrix.python }}"
 
@@ -53,19 +53,30 @@ jobs:
             exit 1
           }
 
-      - name: Verify the locked environment
+      - name: Verify the production dependency export
         run: |
           uv lock --check
-          uv sync --locked --python "${{ matrix.python }}"
+          exported_requirements="$(mktemp)"
+          uv export --locked --no-dev --no-emit-project --no-annotate \
+            --no-header --output-file "$exported_requirements" >/dev/null
+          diff -u requirements.lock "$exported_requirements"
+
+      - name: Bootstrap an empty release environment
+        env:
+          VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}/voicebridge-bootstrap
+          VOICEBRIDGE_PYTHON: python
+        run: ./bin/voicebridge-mcp-bootstrap </dev/null
 
       - name: Validate source and plugins
         run: |
-          uv run --locked --python "${{ matrix.python }}" python -c 'import mlx.core as mx; print(mx.default_device())'
-          uv run --locked --python "${{ matrix.python }}" python scripts/validate_plugin.py
-          uv run --locked --python "${{ matrix.python }}" python -m unittest discover -s tests -v
+          runtime_python="$RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python"
+          "$runtime_python" -c 'import mlx.core as mx; print(mx.default_device())'
+          "$runtime_python" scripts/validate_plugin.py
+          "$runtime_python" -m unittest discover -s tests -v
 
       - name: Build and inspect release artifacts
         run: |
           artifact_dir="$(mktemp -d)"
           uv build --out-dir "$artifact_dir"
-          uv run --locked --python "${{ matrix.python }}" python scripts/verify_distribution.py "$artifact_dir"
+          "$RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python" \
+            scripts/verify_distribution.py "$artifact_dir"

@@ -63,32 +63,38 @@ jobs:
             name: "macOS 26, Python 3.14"
     steps:
       - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ matrix.python }}"
 
       - name: Install uv
         run: python -m pip install --disable-pip-version-check "uv==0.7.11"
 
-      - name: Verify the lockfile
-        run: uv lock --check
+      - name: Verify the production dependency export
+        run: |
+          uv lock --check
+          exported_requirements="$(mktemp)"
+          uv export --locked --no-dev --no-emit-project --no-annotate \
+            --no-header --output-file "$exported_requirements" >/dev/null
+          diff -u requirements.lock "$exported_requirements"
 
-      - name: Install the locked environment
-        run: uv sync --locked --python "${{ matrix.python }}"
+      - name: Bootstrap an empty production environment
+        env:
+          VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}/voicebridge-bootstrap
+          VOICEBRIDGE_PYTHON: python
+        run: ./bin/voicebridge-mcp-bootstrap </dev/null
 
       - name: Verify the native MLX runtime
-        run: |
-          uv run --locked --python "${{ matrix.python }}" python -c \
-            'import mlx.core as mx; print(mx.default_device())'
+        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -c 'import mlx.core as mx; print(mx.default_device())'
 
       - name: Validate plugin contracts
-        run: uv run --locked --python "${{ matrix.python }}" python scripts/validate_plugin.py
+        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python scripts/validate_plugin.py
 
       - name: Run unit tests
-        run: uv run --locked --python "${{ matrix.python }}" python -m unittest discover -s tests -v
+        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -m unittest discover -s tests -v
 
   package:
     name: Package artifacts
@@ -96,10 +102,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
 
@@ -109,14 +115,11 @@ jobs:
       - name: Verify the lockfile
         run: uv lock --check
 
-      - name: Install the locked environment
-        run: uv sync --locked --python "3.14"
-
       - name: Build and inspect package artifacts
         run: |
           artifact_dir="$(mktemp -d)"
           uv build --out-dir "$artifact_dir"
-          uv run --locked --python "3.14" python scripts/verify_distribution.py "$artifact_dir"
+          python scripts/verify_distribution.py "$artifact_dir"
 
   dependency-review:
     name: Dependency review

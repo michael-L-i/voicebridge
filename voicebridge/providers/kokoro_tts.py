@@ -5,6 +5,7 @@ from mlx_audio.tts.utils import load_model
 
 from voicebridge.config import TTSConfig
 from voicebridge.providers.base import TTSProvider
+from voicebridge.providers.output import model_output_to_stderr
 
 # mlx-audio's Kokoro vocoder has a reproducible shape-mismatch bug
 # (`broadcast_shapes` in its ISTFT harmonic-source generator) that depends on
@@ -27,15 +28,17 @@ class KokoroTTSProvider(TTSProvider):
 
     def load(self) -> "KokoroTTSProvider":
         if self._model is None:
-            self._model = load_model(self.config.model)
+            with model_output_to_stderr():
+                self._model = load_model(self.config.model)
         return self
 
     def synthesize(self, text: str, voice: str | None = None) -> np.ndarray:
         self.load()
         sentences = [s.strip() for s in _SENTENCE_SPLIT_RE.split(text.strip()) if s.strip()]
-        chunks = []
-        for sentence in sentences:
-            chunks.extend(self._synthesize_resilient(sentence, voice, depth=0))
+        with model_output_to_stderr():
+            chunks = []
+            for sentence in sentences:
+                chunks.extend(self._synthesize_resilient(sentence, voice, depth=0))
         if not chunks:
             return np.zeros(0, dtype=np.float32)
         return np.concatenate(chunks).astype(np.float32)
