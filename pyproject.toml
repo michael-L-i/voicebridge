@@ -48,7 +48,7 @@ dependencies = [
   "num2words",
   "phonemizer-fork",
   "espeakng-loader",
-  "sounddevice>=0.5",
+  "sounddevice>=0.5.5",
   "numpy>=1.26",
   # Real frame-classifying voice activity detection (Google's WebRTC VAD),
   # replacing a naive RMS energy threshold -- this is the single biggest
