@@ -2,8 +2,8 @@
 # Declared as this plugin's MCP server command in the plugin manifest. Ensures a
 # private venv with voicebridge + its local speech deps (mlx-audio, misaki,
 # spacy, ...) exists under the selected data directory, building it on first
-# run (or after a plugin update changes pyproject.toml), then execs into the
-# real voicebridge-mcp entrypoint inside that venv.
+# run (or after a plugin update changes the locked dependencies), then execs
+# into the real voicebridge-mcp entrypoint inside that venv.
 #
 # IMPORTANT: stdout is the live MCP stdio JSON-RPC channel. Every log line in
 # this script MUST go to stderr (>&2) -- writing anything to stdout before
@@ -15,6 +15,7 @@ DATA_DIR="${VOICEBRIDGE_DEV_DATA_DIR:-${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebrid
 VENV_DIR="${DATA_DIR}/venv"
 MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
+REQUIREMENTS="${PLUGIN_ROOT}/requirements.lock"
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "[voicebridge] ERROR: VoiceBridge requires macOS on Apple Silicon." >&2
@@ -27,10 +28,16 @@ fi
 
 mkdir -p "${DATA_DIR}"
 
-# Marker = hash of pyproject.toml only, not the whole tree: a dependency
-# change (plugin update) invalidates the venv and forces a rebuild; a
-# pure-code change doesn't, since the editable install already reflects it.
-CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" | awk '{print $1}')
+if [ ! -f "${REQUIREMENTS}" ]; then
+  echo "[voicebridge] ERROR: bundled dependency lock is missing:" >&2
+  echo "  ${REQUIREMENTS}" >&2
+  exit 1
+fi
+
+# A dependency declaration or lock export change invalidates the venv. Pure
+# code changes do not, since the editable install already reflects them.
+CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" "${REQUIREMENTS}" | \
+  awk '{print $1}' | shasum -a 256 | awk '{print $1}')
 
 NEEDS_INSTALL=1
 if [ -x "${VENV_DIR}/bin/voicebridge-mcp" ] && \
@@ -44,8 +51,11 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
        "can take a few minutes (dependency install; model weights download" \
        "when voice mode starts for the first time)." >&2
 
-  PYTHON_BIN=$(command -v python3.13 || command -v python3.12 || \
-    command -v python3.11 || command -v python3 || true)
+  PYTHON_BIN="${VOICEBRIDGE_PYTHON:-}"
+  if [ -z "${PYTHON_BIN}" ]; then
+    PYTHON_BIN=$(command -v python3.13 || command -v python3.12 || \
+      command -v python3.11 || command -v python3 || true)
+  fi
   if [ -z "${PYTHON_BIN}" ]; then
     echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11+" \
          "(e.g. brew install python@3.12) and start a new session." >&2
@@ -63,15 +73,69 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
     exit 1
   fi
 
-  rm -rf "${VENV_DIR}"
-  "${PYTHON_BIN}" -m venv "${VENV_DIR}"
-  "${VENV_DIR}/bin/pip" install --quiet --upgrade pip >&2
-  if ! "${VENV_DIR}/bin/pip" install --quiet -e "${PLUGIN_ROOT}" >&2; then
-    echo "[voicebridge] ERROR: dependency install failed. Retry manually:" >&2
-    echo "  ${VENV_DIR}/bin/pip install -e ${PLUGIN_ROOT}" >&2
+  # Build at its permanent path so venv shebangs remain valid. The stable
+  # venv path is switched only after every install step succeeds.
+  BUILD_DIR=$(mktemp -d "${DATA_DIR}/.venv-build.XXXXXX")
+  NEXT_LINK=""
+  cleanup_install() {
+    if [ -n "${NEXT_LINK}" ] && [ -L "${NEXT_LINK}" ]; then
+      rm -- "${NEXT_LINK}"
+    fi
+    if [ -n "${BUILD_DIR}" ] && [ -d "${BUILD_DIR}" ]; then
+      rm -rf -- "${BUILD_DIR}"
+    fi
+  }
+  trap cleanup_install EXIT
+
+  "${PYTHON_BIN}" -m venv "${BUILD_DIR}"
+  "${BUILD_DIR}/bin/pip" install --quiet --upgrade pip >&2
+  # misaki 0.9.4 declares Python <3.13 even though the locked release is
+  # exercised on 3.11-3.14 in CI; uv installs it across that supported matrix.
+  if ! "${BUILD_DIR}/bin/pip" install --quiet --require-hashes \
+    --ignore-requires-python -r "${REQUIREMENTS}" >&2 || \
+     ! "${BUILD_DIR}/bin/pip" install --quiet --no-deps \
+    -e "${PLUGIN_ROOT}" >&2; then
+    echo "[voicebridge] ERROR: locked dependency install failed." >&2
+    echo "  The previous environment is unchanged; restart to retry." >&2
     exit 1
   fi
-  echo "${CURRENT_HASH}" > "${MARKER_FILE}"
+  echo "${CURRENT_HASH}" > "${BUILD_DIR}/.voicebridge-install-marker"
+
+  NEXT_LINK=$(mktemp -d "${DATA_DIR}/.venv-link.XXXXXX")
+  rmdir "${NEXT_LINK}"
+  ln -s "${BUILD_DIR}" "${NEXT_LINK}"
+
+  OLD_TARGET=""
+  if [ -L "${VENV_DIR}" ]; then
+    OLD_TARGET=$(readlink "${VENV_DIR}")
+    case "${OLD_TARGET}" in
+      /*) ;;
+      *) OLD_TARGET="${DATA_DIR}/${OLD_TARGET}" ;;
+    esac
+    mv -f "${NEXT_LINK}" "${VENV_DIR}"
+  elif [ -e "${VENV_DIR}" ]; then
+    # Migrate the legacy real directory only after the replacement is ready.
+    OLD_TARGET=$(mktemp -d "${DATA_DIR}/.venv-previous.XXXXXX")
+    rmdir "${OLD_TARGET}"
+    mv "${VENV_DIR}" "${OLD_TARGET}"
+    if ! mv "${NEXT_LINK}" "${VENV_DIR}"; then
+      mv "${OLD_TARGET}" "${VENV_DIR}"
+      echo "[voicebridge] ERROR: could not activate the new environment." >&2
+      exit 1
+    fi
+  else
+    mv "${NEXT_LINK}" "${VENV_DIR}"
+  fi
+  NEXT_LINK=""
+  BUILD_DIR=""
+
+  # Only remove environments created or migrated by this bootstrap.
+  case "${OLD_TARGET}" in
+    "${DATA_DIR}"/.venv-build.*|"${DATA_DIR}"/.venv-previous.*)
+      rm -rf -- "${OLD_TARGET}"
+      ;;
+  esac
+  trap - EXIT
   echo "[voicebridge] setup complete." >&2
 fi
 

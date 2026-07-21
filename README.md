@@ -206,15 +206,17 @@ confirming an update actually restarted the MCP process.
 
 ## CI and releases
 
-Pull requests and pushes to `main` run locked dependency checks, plugin
-contract validation, unit tests, and a fresh-process MLX native-import smoke
-check across every supported GitHub-hosted Apple-Silicon macOS image
-(`macos-14`, `macos-15`, and `macos-26`) and Python 3.11 through 3.14. Package
-artifacts are built and inspected once on macOS 14 / Python 3.14. The release
-workflow repeats the compatibility matrix for a published GitHub release and
-verifies that its `vX.Y.Z` tag matches the package version. It validates build
-artifacts only; it does not publish to PyPI or require publishing credentials.
-See [RELEASING.md](RELEASING.md) for the maintainer procedure.
+Pull requests and pushes to `main` verify the production requirements export,
+bootstrap the plugin from an empty data directory, then run plugin contracts,
+unit tests, and an MLX native-import smoke check in that production-style
+environment. The matrix covers every supported GitHub-hosted Apple-Silicon
+macOS image (`macos-14`, `macos-15`, and `macos-26`) and Python 3.11 through
+3.14. Package artifacts are built and inspected once on macOS 14 / Python
+3.14. The release workflow repeats the bootstrapped compatibility matrix for a
+published GitHub release and verifies that its `vX.Y.Z` tag matches the package
+version. It validates build artifacts only; it does not publish to PyPI or
+require publishing credentials. See [RELEASING.md](RELEASING.md) for the
+maintainer procedure.
 
 ## Contributing and support
 
