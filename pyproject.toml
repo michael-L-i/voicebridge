@@ -56,7 +56,7 @@ dependencies = [
   # cutoff. "-wheels" is a maintained fork with importlib.metadata support
   # (no pkg_resources dependency), matching what voicemode itself uses.
   "webrtcvad-wheels>=2.0.14",
-  "pydantic>=2.9",
+  "pydantic>=2.13.4",
   "mcp>=1.2",
   "click>=8.1",
 ]
