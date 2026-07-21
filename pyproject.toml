@@ -44,7 +44,7 @@ dependencies = [
   "misaki",
   # spaCy 3.8.14 omitted CPython 3.14 macOS ARM wheels. Keep the Python 3.14
   # compatible 3.8.9-3.8.13 range until upstream publishes a fixed release.
-  "spacy>=3.8.9,<3.8.14",
+  "spacy>=3.8.14,<3.8.15",
   "num2words",
   "phonemizer-fork",
   "espeakng-loader",
