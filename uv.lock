@@ -2471,7 +2471,7 @@ requires-dist = [
     { name = "num2words" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "phonemizer-fork" },
-    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pydantic", specifier = ">=2.13.4" },
     { name = "sounddevice", specifier = ">=0.5.5" },
     { name = "spacy", specifier = ">=3.8.9,<3.8.14" },
     { name = "webrtcvad-wheels", specifier = ">=2.0.14" },
