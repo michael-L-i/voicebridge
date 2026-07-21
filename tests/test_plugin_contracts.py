@@ -144,9 +144,13 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("VOICEBRIDGE_DEV_DATA_DIR", source)
-        self.assertLess(source.index("uname -s"), source.index('rm -rf "${VENV_DIR}"'))
+        self.assertIn('REQUIREMENTS="${PLUGIN_ROOT}/requirements.lock"', source)
+        self.assertIn("--require-hashes", source)
+        self.assertIn("--no-deps", source)
+        self.assertNotIn('pip" install --quiet -e', source)
+        self.assertLess(source.index("uname -s"), source.index("BUILD_DIR=$(mktemp"))
         self.assertLess(
-            source.index("version_info < (3, 11)"), source.index('rm -rf "${VENV_DIR}"')
+            source.index("version_info < (3, 11)"), source.index("BUILD_DIR=$(mktemp")
         )
         logical_source = source.replace("\\\n", "")
         for line in logical_source.splitlines():
