@@ -177,10 +177,22 @@ class DevCliTests(unittest.TestCase):
         self.assertNotIn("plugin", " ".join(arguments))
         self.assertNotIn("marketplace", " ".join(arguments))
 
-    def test_codex_development_skill_points_at_canonical_source(self):
-        development_skill = ROOT / ".agents/skills/voice-code"
-        self.assertTrue(development_skill.is_symlink())
-        self.assertEqual(development_skill.resolve(), ROOT / "skills/voice-code")
+    def test_codex_development_skills_point_at_all_canonical_sources(self):
+        canonical_root = ROOT / "skills"
+        development_root = ROOT / ".agents/skills"
+        canonical_skills = {
+            path.name for path in canonical_root.iterdir() if path.is_dir()
+        }
+        development_skills = {path.name for path in development_root.iterdir()}
+
+        self.assertEqual(development_skills, canonical_skills)
+        for name in canonical_skills:
+            development_skill = development_root / name
+            self.assertTrue(development_skill.is_symlink())
+            self.assertEqual(
+                development_skill.readlink(), Path("../../skills") / name
+            )
+            self.assertEqual(development_skill.resolve(), canonical_root / name)
 
     def test_codex_fresh_resets_onboarding_but_keeps_venv(self):
         with tempfile.TemporaryDirectory() as directory:

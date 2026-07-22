@@ -17,6 +17,32 @@ def load_json(relative_path: str) -> dict:
     return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
 
 
+def validate_development_skills(failures: list[str]) -> None:
+    canonical_root = ROOT / "skills"
+    development_root = ROOT / ".agents/skills"
+    canonical_skills = {
+        path.name for path in canonical_root.iterdir() if path.is_dir()
+    }
+    development_skills = {path.name for path in development_root.iterdir()}
+
+    for name in sorted(canonical_skills - development_skills):
+        failures.append(f"Codex development skill is missing: .agents/skills/{name}")
+    for name in sorted(development_skills - canonical_skills):
+        failures.append(f"unexpected Codex development skill: .agents/skills/{name}")
+    for name in sorted(canonical_skills & development_skills):
+        development_skill = development_root / name
+        expected_target = Path("../../skills") / name
+        if not development_skill.is_symlink():
+            failures.append(
+                f"Codex development skill must be a symlink: .agents/skills/{name}"
+            )
+        elif development_skill.readlink() != expected_target:
+            failures.append(
+                f"Codex development skill must point to {expected_target}: "
+                f".agents/skills/{name}"
+            )
+
+
 def main() -> int:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project = tomllib.load(file)["project"]
@@ -40,14 +66,19 @@ def main() -> int:
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
 
+    validate_development_skills(failures)
+
     required_paths = [
         "bin/voicebridge-mcp-bootstrap",
         "commands/voice-code.md",
+        "commands/voice-interrupt.md",
         "commands/voice-settings.md",
         "config/default_config.toml",
         "requirements.lock",
         "skills/voice-code/SKILL.md",
         "skills/voice-code/agents/openai.yaml",
+        "skills/voice-interrupt/SKILL.md",
+        "skills/voice-interrupt/agents/openai.yaml",
         "skills/voice-settings/SKILL.md",
         "skills/voice-settings/agents/openai.yaml",
     ]
