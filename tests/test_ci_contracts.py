@@ -31,6 +31,8 @@ class CiContractTests(unittest.TestCase):
         self.assertIn("diff -u requirements.lock", workflow)
         self.assertIn("Bootstrap an empty production environment", workflow)
         self.assertIn("./bin/voicebridge-mcp-bootstrap </dev/null", workflow)
+        self.assertIn("Verify the bootstrapped Kokoro English frontend", workflow)
+        self.assertIn("-p test_kokoro_frontend.py", workflow)
         self.assertIn("VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}", workflow)
         self.assertIn("VOICEBRIDGE_PYTHON: python", workflow)
         self.assertNotIn("uv sync --locked", workflow)
@@ -51,6 +53,8 @@ class CiContractTests(unittest.TestCase):
         self.assertIn('python: ["3.11", "3.12", "3.13", "3.14"]', workflow)
         self.assertIn("Verify the release tag matches the package version", workflow)
         self.assertIn("Bootstrap an empty release environment", workflow)
+        self.assertIn("Verify the bootstrapped Kokoro English frontend", workflow)
+        self.assertIn("-p test_kokoro_frontend.py", workflow)
         self.assertIn("diff -u requirements.lock", workflow)
         self.assertNotIn("uv sync --locked", workflow)
         self.assertIn("uv build --out-dir", workflow)
@@ -63,6 +67,11 @@ class CiContractTests(unittest.TestCase):
 
         self.assertIn("mlx-audio==0.4.5", requirements)
         self.assertIn("misaki==0.9.4", requirements)
+        self.assertIn(
+            "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/"
+            "download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+            requirements,
+        )
         self.assertIn("huggingface-hub==1.23.0", requirements)
         self.assertIn("--hash=sha256:", requirements)
 

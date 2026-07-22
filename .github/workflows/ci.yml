@@ -87,6 +87,11 @@ jobs:
           VOICEBRIDGE_PYTHON: python
         run: ./bin/voicebridge-mcp-bootstrap </dev/null
 
+      - name: Verify the bootstrapped Kokoro English frontend
+        run: |
+          $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -m unittest \
+            discover -s tests -p test_kokoro_frontend.py -v
+
       - name: Verify the native MLX runtime
         run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -c 'import mlx.core as mx; print(mx.default_device())'
 
