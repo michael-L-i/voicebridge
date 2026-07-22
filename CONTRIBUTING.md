@@ -81,9 +81,11 @@ marketplace:
 ./dev codex
 ```
 
-Then invoke `$voice-code`. The launcher supplies the local MCP server through
-one-session Codex overrides, and the repository exposes the canonical skill
-through `.agents/skills/`. No user-level Codex configuration is changed.
+Then invoke `$voice-code` to start a conversation, `$voice-settings` to choose
+models, or `$voice-interrupt` after stopping an active turn. The launcher
+supplies the local MCP server through one-session Codex overrides, and the
+repository exposes all canonical skills through `.agents/skills/`. No
+user-level Codex configuration is changed.
 
 Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.

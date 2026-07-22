@@ -51,8 +51,10 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   prevents Claude Code from also discovering it as a project MCP server during
   direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
-- `skills/voice-code/`: explicit Codex `$voice-code` workflow.
-- `skills/voice-interrupt/`: explicit Codex `$voice-interrupt` recovery flow.
+- `skills/voice-code/`, `skills/voice-settings/`, and
+  `skills/voice-interrupt/`: canonical Codex workflows.
+- `.agents/skills/`: relative symlinks to every canonical Codex skill so direct
+  checkouts expose the same workflows as installed plugins.
 - `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
   under `VOICEBRIDGE_DATA_DIR` on first run (or after a dependency change),
   then `exec`s into the real `voicebridge-mcp` entrypoint inside it. Claude Code
