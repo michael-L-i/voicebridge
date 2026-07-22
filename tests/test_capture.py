@@ -1,4 +1,5 @@
 import sys
+import threading
 import time
 import unittest
 from types import SimpleNamespace
@@ -260,6 +261,51 @@ class ListenTests(unittest.TestCase):
 
         self.assertEqual(result.end_reason, "device_error")
         self.assertIn("stopped delivering", result.error)
+
+    def test_cancellation_stops_capture_without_end_chime(self):
+        cancelled = threading.Event()
+
+        class _CancellingInputStream(_FakeInputStream):
+            def __enter__(self):
+                threading.Timer(0.02, cancelled.set).start()
+                return self
+
+        with (
+            patch.object(
+                capture.sd,
+                "InputStream",
+                lambda **kwargs: _CancellingInputStream(**kwargs),
+            ),
+            patch.object(capture, "play_chime_start"),
+            patch.object(capture, "play_chime_end") as play_end,
+            patch.object(capture, "_SETTLE_MS", 1000),
+        ):
+            started_at = time.monotonic()
+            result = capture.listen(
+                16000,
+                max_listen_ms=10000,
+                cancel_event=cancelled,
+            )
+
+        self.assertLess(time.monotonic() - started_at, 0.5)
+        self.assertEqual(result.end_reason, "cancelled")
+        self.assertFalse(result.speech_detected)
+        self.assertEqual(result.audio.size, 0)
+        play_end.assert_not_called()
+
+    def test_pre_cancelled_capture_does_not_open_audio_devices(self):
+        cancelled = threading.Event()
+        cancelled.set()
+
+        with (
+            patch.object(capture.sd, "InputStream") as input_stream,
+            patch.object(capture, "play_chime_start") as play_start,
+        ):
+            result = capture.listen(16000, cancel_event=cancelled)
+
+        self.assertEqual(result.end_reason, "cancelled")
+        input_stream.assert_not_called()
+        play_start.assert_not_called()
 
 
 if __name__ == "__main__":

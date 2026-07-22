@@ -8,10 +8,12 @@ an active conversation; there is no HTTP daemon or local summarization model.
 Speech models run through MLX Audio. MLX is not used to generate or rewrite
 Claude's response.
 
-There is one integration surface: `/voicebridge:voice-code`. It loops between
+The main integration surface is `/voicebridge:voice-code`. It loops between
 choosing models on a new install, then speaking and listening through
-`voice_start`, `voice_speak`, `voice_listen`, and `voice_stop`. Claude Code
-supplies the exact text spoken by TTS. There is no passive narration.
+`voice_start`, `voice_speak`, `voice_listen`, and `voice_stop`. After pressing
+Escape, `/voicebridge:voice-interrupt` silences current audio and captures added
+guidance through `voice_interrupt`. Claude Code supplies the exact text spoken
+by TTS. There is no passive narration.
 
 Read `AGENTS.md` for the shared project map, commands, development principles,
 and Git workflow. Claude-specific notes below override only when they conflict.
@@ -28,8 +30,9 @@ and Git workflow. Claude-specific notes below override only when they conflict.
   visible in Claude Code, while `voice_speak` receives a separately composed,
   concise result or question based on the current task. Summary requests should
   answer the requested subject, not explain the voice machinery.
-- `voice_stop` drops both model providers, clears the MLX cache, and releases the
-  session lock. Process exit is the safety net, so no shutdown hook is needed.
+- `voice_stop` cancels active audio, drops both model providers, clears the MLX
+  cache, and releases the session lock. Normal MCP process exit runs the same
+  cleanup; operating-system process teardown remains the final safety net.
 
 ## Working Expectations
 

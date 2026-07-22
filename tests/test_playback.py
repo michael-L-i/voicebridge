@@ -1,4 +1,5 @@
 import unittest
+import threading
 from unittest.mock import patch
 
 import numpy as np
@@ -27,20 +28,65 @@ class ChimeTests(unittest.TestCase):
     def test_async_playback_returns_after_start_and_waits_on_handle(self):
         audio = np.ones(8, dtype=np.float32)
 
-        with (
-            patch.object(playback.sd, "play") as play,
-            patch.object(playback.sd, "wait") as wait,
-        ):
+        streams = []
+
+        class _OutputStream:
+            def __init__(self, callback, finished_callback, **kwargs):
+                self.callback = callback
+                self.finished_callback = finished_callback
+                self.kwargs = kwargs
+                streams.append(self)
+
+            def __enter__(self):
+                while True:
+                    outdata = np.empty((4, 1), dtype=np.float32)
+                    try:
+                        self.callback(outdata, 4, None, None)
+                    except playback.sd.CallbackStop:
+                        self.finished_callback()
+                        break
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def abort(self, ignore_errors=False):
+                self.finished_callback()
+
+        with patch.object(playback.sd, "OutputStream", _OutputStream):
             handle = playback.play_async(audio, 24000)
             handle.wait()
 
-        play.assert_called_once_with(
-            audio,
-            samplerate=24000,
-            blocking=False,
-            device=None,
-        )
-        wait.assert_called_once()
+        self.assertEqual(streams[0].kwargs["samplerate"], 24000)
+        self.assertEqual(streams[0].kwargs["channels"], 1)
+        self.assertEqual(streams[0].kwargs["device"], None)
+
+    def test_async_playback_can_be_cancelled_idempotently(self):
+        audio = np.ones(24000, dtype=np.float32)
+        aborted = threading.Event()
+
+        class _StalledOutputStream:
+            def __init__(self, finished_callback, **kwargs):
+                self.finished_callback = finished_callback
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def abort(self, ignore_errors=False):
+                aborted.set()
+                self.finished_callback()
+
+        with patch.object(playback.sd, "OutputStream", _StalledOutputStream):
+            handle = playback.play_async(audio, 24000)
+            handle.cancel()
+            handle.cancel()
+            handle.wait(timeout=0.5)
+
+        self.assertTrue(aborted.is_set())
+        self.assertTrue(handle.cancelled)
 
 
 if __name__ == "__main__":

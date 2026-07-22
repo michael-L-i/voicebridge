@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -275,6 +276,130 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(heard["transcript"], "heard")
         self.assertTrue(heard["capture_queued"])
         self.assertEqual(transcribe_threads, [threading.current_thread().name])
+
+    def test_interrupt_cancels_queued_audio_and_captures_fresh_guidance(self):
+        stt = _FakeSTT()
+        registry = _fake_registry(_FakeTTS(), stt)
+        playback_cancelled = threading.Event()
+        capture_calls = []
+
+        class _CancellablePlayback:
+            def wait(self, timeout=None):
+                if not playback_cancelled.wait(timeout=timeout or 1):
+                    raise TimeoutError("test playback did not stop")
+
+            def cancel(self):
+                playback_cancelled.set()
+
+        cancelled_capture = SimpleNamespace(
+            audio=np.zeros(0, dtype=np.float32),
+            speech_detected=False,
+            end_reason="cancelled",
+            error=None,
+        )
+        guidance_capture = SimpleNamespace(
+            audio=np.ones(8, dtype=np.float32),
+            speech_detected=True,
+            end_reason="silence",
+            error=None,
+        )
+
+        def capture_listen(*args, **kwargs):
+            cancel_event = kwargs["cancel_event"]
+            capture_calls.append(cancel_event)
+            return cancelled_capture if cancel_event.is_set() else guidance_capture
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    playback_module,
+                    "play_async",
+                    return_value=_CancellablePlayback(),
+                ),
+                patch.object(capture_module, "listen", side_effect=capture_listen),
+                patch.object(playback_module, "play_chime_end"),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
+                runtime.speak("Still talking.", listen_after=True)
+
+                result = runtime.interrupt(timeout_ms=5000, silence_ms=750)
+                ready_after_interrupt = runtime.ready
+                runtime.stop()
+
+        self.assertTrue(playback_cancelled.is_set())
+        self.assertGreaterEqual(len(capture_calls), 2)
+        self.assertTrue(capture_calls[0].is_set())
+        self.assertFalse(capture_calls[-1].is_set())
+        self.assertEqual(result["transcript"], "heard")
+        self.assertTrue(result["interrupted"])
+        self.assertTrue(ready_after_interrupt)
+
+    def test_stop_preempts_active_capture_before_waiting_for_operation_lock(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+        capture_started = threading.Event()
+        listen_result = {}
+
+        def capture_listen(*args, **kwargs):
+            capture_started.set()
+            cancel_event = kwargs["cancel_event"]
+            if not cancel_event.wait(timeout=1):
+                raise TimeoutError("test capture was not cancelled")
+            return SimpleNamespace(
+                audio=np.zeros(0, dtype=np.float32),
+                speech_detected=False,
+                end_reason="cancelled",
+                error=None,
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(capture_module, "listen", side_effect=capture_listen),
+                patch.object(playback_module, "play_chime_end"),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
+                listener = threading.Thread(
+                    target=lambda: listen_result.update(runtime.listen()),
+                    daemon=True,
+                )
+                listener.start()
+                self.assertTrue(capture_started.wait(timeout=1))
+
+                started_at = time.monotonic()
+                stopped = runtime.stop()
+                elapsed = time.monotonic() - started_at
+                listener.join(timeout=1)
+
+        self.assertFalse(listener.is_alive())
+        self.assertLess(elapsed, 0.5)
+        self.assertTrue(stopped["stopped"])
+        self.assertEqual(listen_result["end_reason"], "cancelled")
+        self.assertFalse(runtime.ready)
+
+    def test_interrupt_requires_an_active_session(self):
+        runtime = runtime_module.VoiceRuntime(Config())
+
+        with self.assertRaisesRegex(RuntimeError, "start Voice Code first"):
+            runtime.interrupt()
 
     def test_listen_uses_config_timing_unless_overridden(self):
         tts = _FakeTTS()

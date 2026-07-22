@@ -45,7 +45,11 @@ exit 1
         )
         fake_pip.write_text(
             """#!/bin/bash
+printf '%s\\n' "$*" >> "$PIP_CALLS"
 case " $* " in
+  *" --upgrade "*" pip "*)
+    exit 43
+    ;;
   *" --require-hashes "*)
     if [ "${FAIL_LOCK_INSTALL:-0}" = "1" ]; then
       exit 42
@@ -99,6 +103,7 @@ exec {shutil.which("mv")} "$@"
             "FAKE_PIP": str(fake_pip),
             "FAKE_SERVER": str(fake_server),
             "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "PIP_CALLS": str(root / "pip-calls"),
         }
         return plugin / "bin/voicebridge-mcp-bootstrap", data, environment
 
@@ -172,6 +177,24 @@ exec {shutil.which("mv")} "$@"
             self.assertEqual((data / "venv").resolve(), old_target)
             self.assertTrue((old_target / "bin/voicebridge-mcp").is_file())
             self._assert_only_active_environment_remains(data)
+
+    def test_uses_bundled_pip_only_for_locked_runtime_and_local_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, _, environment = self._fixture(Path(directory))
+
+            result = subprocess.run(
+                [str(bootstrap)], env=environment, capture_output=True, text=True
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = Path(environment["PIP_CALLS"]).read_text().splitlines()
+            self.assertEqual(len(calls), 2)
+            self.assertIn("--require-hashes", calls[0])
+            self.assertIn("--ignore-requires-python", calls[0])
+            self.assertIn("requirements.lock", calls[0])
+            self.assertIn("--no-deps", calls[1])
+            self.assertIn(" -e ", f" {calls[1]} ")
+            self.assertNotIn("--upgrade", " ".join(calls))
 
     def test_failed_update_preserves_legacy_working_environment(self):
         with tempfile.TemporaryDirectory() as directory:
