@@ -19,15 +19,47 @@ Maintain two outputs for completed work:
   read code, file paths, bullet lists, or the full written response aloud.
 
 1. Call `voice_status`. If `first_run` is true, call `voice_models` before any
-   audio tool or model download. Present separate TTS and STT single-choice
-   selectors using Codex's structured question UI when available, with a
-   numbered conversational fallback. The structured UI starts on the first
-   listed option, so list the returned default first in each selector (Pocket
-   TTS and Parakeet 110M STT) with "(Recommended)" appended to its label, then
-   the remaining options lightest to heaviest. Show each option's tier and
-   download size. If the user cancels, end without calling
-   `voice_start`. Otherwise call `voice_configure` with both selected IDs.
-   Existing users with `first_run: false` skip this onboarding choice.
+   audio tool or model download. Before asking any questions, reproduce this
+   fixed onboarding script verbatim in a fenced `text` block. Do not summarize,
+   rearrange, restyle, or generate any part of it from the model response.
+
+   ```text
+   +-- WELCOME TO VOICEBRIDGE -----------------------------------------+
+   |
+   | Let's talk through whatever you're working on.
+   |
+   | YOU SPEAK -> I WORK -> SHORT REPLY ALOUD + DETAILS ON SCREEN
+   |
+   | We alternate turns. After the listening chime, speak naturally.
+   | When I finish, the microphone opens again for your next turn.
+   |
+   +-- CONTROLS -------------------------------------------------------+
+   | $voice-code       Start a voice conversation.
+   | $voice-settings   Change the local voice or listening model.
+   | $voice-interrupt  After pressing Escape, add new guidance.
+   | Say "stop" or "goodbye" to finish the conversation.
+   |
+   +-- PRESET MODELS --------------------------------------------------+
+   | Voice (TTS)       Pocket TTS 100M
+   | Listening (STT)   Parakeet 110M
+   | These recommended models are already selected. Keep them or
+   | choose a different pair next.
+   |
+   +-- PRIVACY --------------------------------------------------------+
+   | Speech recognition and synthesis run locally on this Mac.
+   | Your transcript becomes a normal Codex instruction.
+   +------------------------------------------------------------------+
+   ```
+
+   Then present separate TTS and STT single-choice selectors using Codex's
+   structured question UI when available, with a numbered conversational
+   fallback. The structured UI starts on the first listed option, so list the
+   returned default first in each selector with "(Recommended)" appended to its
+   label, then the remaining options lightest to heaviest. Show each option's
+   tier, download size, and short description. If the user cancels, end without
+   calling `voice_start`. Otherwise call `voice_configure` with both selected
+   IDs. Existing users with `first_run: false` skip the fixed script and
+   onboarding choice silently.
 2. Call `voice_start` and wait for the audio preflight and local speech models.
    Do not call any VoiceBridge audio tool before this explicit skill invocation.
    If it returns `ok: false`, show the error and end without retrying.
@@ -35,10 +67,16 @@ Maintain two outputs for completed work:
    that `host` is `codex`. If not, the MCP process is stale or misconfigured:
    call `voice_stop`, ask the user to start a new Codex session after updating
    or reinstalling the plugin, and end.
-4. Speak a brief one-sentence greeting with `listen_after: true`, then call
-   `voice_listen` immediately. VoiceBridge opens the mic as soon as playback
-   finishes and the listen call collects that queued capture. Do not add filler
-   or perform other work between those tool calls.
+4. Speak a greeting with `listen_after: true`, then call `voice_listen`
+   immediately. If `first_run` was true, use this short introduction verbatim:
+   "Welcome to VoiceBridge. We can talk through whatever you're working on:
+   after the chime, speak naturally, and I'll reply aloud while keeping the
+   useful details on screen. If you want to redirect me, press Escape and choose
+   Voice Interrupt; I'm listening, so what would you like to work on?"
+   Otherwise use an ordinary casual one-sentence greeting. VoiceBridge opens
+   the mic as soon as playback finishes and the listen call collects that
+   queued capture. Do not add filler or perform other work between those tool
+   calls.
 5. Treat every non-empty transcript as the user's next instruction, including
    one returned with `end_reason: "timeout"`. Use normal Codex tools to do the
    work silently, without spoken command-by-command narration.
