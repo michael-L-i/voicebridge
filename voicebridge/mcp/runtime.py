@@ -26,6 +26,13 @@ class VoiceSessionBusy(RuntimeError):
     pass
 
 
+class VoiceSessionNotStarted(RuntimeError):
+    error_code = "session_not_started"
+
+    def __init__(self) -> None:
+        super().__init__("voice session is not started; call voice_start first")
+
+
 @dataclass(frozen=True)
 class _QueuedCapture:
     result: Any
@@ -141,12 +148,11 @@ class VoiceRuntime:
         listen_after: bool = False,
     ) -> dict:
         """Speak the host agent's exact text with no local rewriting."""
-        spoken_text = text.strip()
-        if not spoken_text:
-            raise ValueError("voice_speak requires non-empty text")
-
         with self._operation_lock:
-            self._ensure_started()
+            self._require_started()
+            spoken_text = text.strip()
+            if not spoken_text:
+                raise ValueError("voice_speak requires non-empty text")
             with self._queued_listen_lock:
                 if self._queued_listen is not None:
                     raise RuntimeError(
@@ -333,9 +339,9 @@ class VoiceRuntime:
                 },
             }
 
-    def _ensure_started(self) -> None:
+    def _require_started(self) -> None:
         if not self.ready:
-            self.start()
+            raise VoiceSessionNotStarted()
 
     def _wait_for_playback(self, timeout: float | None = None) -> None:
         with self._activity_lock:
@@ -385,7 +391,7 @@ class VoiceRuntime:
         self, queued_cancel: threading.Event
     ) -> _QueuedCapture:
         with self._operation_lock:
-            self._ensure_started()
+            self._require_started()
             cancel_event = self._begin_capture(queued_cancel)
             try:
                 self._wait_for_playback()
@@ -420,7 +426,7 @@ class VoiceRuntime:
         *,
         queued_capture: _QueuedCapture | None = None,
     ) -> dict:
-        self._ensure_started()
+        self._require_started()
         from voicebridge.audio.capture import listen
         from voicebridge.audio.playback import audio_lock, play_chime_end
 

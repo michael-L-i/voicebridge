@@ -63,7 +63,9 @@ Maintain two outputs for completed work:
 11. If the user says stop, goodbye, or equivalent, speak a short goodbye with
     `listen_after` false, call `voice_stop`, and do not listen again.
 12. If `voice_speak` or `voice_listen` returns `ok: false`, show the error, call
-    `voice_stop`, and end instead of retrying indefinitely.
+    `voice_stop`, and end instead of retrying indefinitely. In particular,
+    `error_code: "session_not_started"` means the required `voice_start` did not
+    complete; do not use an audio tool to activate or recover the session.
 
 After `voice_start` succeeds, call `voice_stop` exactly once at the end and
 never between turns. Keep speech brief unless the user explicitly requests a

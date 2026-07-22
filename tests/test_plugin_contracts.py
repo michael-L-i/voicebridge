@@ -78,6 +78,8 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn(f"mcp__voicebridge__{tool}", skill)
             self.assertIn(f"mcp__voicebridge__{tool}", command)
         self.assertIn("If `first_run` is true", command)
+        self.assertIn('error_code: "session_not_started"', skill)
+        self.assertIn('error_code: "session_not_started"', command)
 
     def test_settings_are_available_from_both_host_uis(self):
         skill = (ROOT / "skills/voice-settings/SKILL.md").read_text(
@@ -132,6 +134,7 @@ class PluginContractTests(unittest.TestCase):
             },
         )
         self.assertIn("Only call audio tools after the user explicitly", source)
+        self.assertIn("never starts a session or loads models implicitly", source)
 
     def test_interrupt_is_available_from_both_host_uis(self):
         skill = (ROOT / "skills/voice-interrupt/SKILL.md").read_text(
