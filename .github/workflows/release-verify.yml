@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Git ref to verify
-        required: false
-        default: main
+        description: Candidate branch or full commit SHA (required before merge)
+        required: true
         type: string
 
 permissions:

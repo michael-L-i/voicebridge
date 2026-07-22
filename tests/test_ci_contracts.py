@@ -49,6 +49,16 @@ class CiContractTests(unittest.TestCase):
 
         self.assertIn("release:", workflow)
         self.assertIn("types: [published]", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn(
+            "description: Candidate branch or full commit SHA (required before merge)",
+            workflow,
+        )
+        self.assertEqual(workflow.count("required: true"), 1)
+        self.assertNotIn("default: main", workflow)
+        self.assertIn(
+            "ref: ${{ github.event.release.tag_name || inputs.ref }}", workflow
+        )
         self.assertIn('macos: ["macos-14", "macos-15", "macos-26"]', workflow)
         self.assertIn('python: ["3.11", "3.12", "3.13", "3.14"]', workflow)
         self.assertIn("Verify the release tag matches the package version", workflow)
