@@ -8,6 +8,9 @@ VoiceBridge is a local voice conversation plugin for Codex and Claude Code on
 Apple Silicon. Start Voice Code, talk naturally, and let your coding agent
 decide what to say back.
 
+See [VoiceBridge privacy](PRIVACY.md) for the precise local-processing and host
+handoff boundary.
+
 The plugin is deliberately small:
 
 - Codex or Claude Code controls the conversation and writes every spoken response.
@@ -32,18 +35,23 @@ them and clears the MLX cache.
 VoiceBridge offers several local options in each direction, ordered by
 resource use:
 
-| TTS | Tier | Download |
-| --- | --- | ---: |
-| Pocket TTS 100M | Lightweight | 236 MB |
-| Kokoro 82M | Lightweight | 389 MB |
-| Chatterbox Turbo 350M | Balanced | 417 MB |
-| Qwen 0.6B | Heavy, highest quality | 1.97 GB |
+| TTS model card | Tier | Language in VoiceBridge | License | Download |
+| --- | --- | --- | --- | ---: |
+| [Pocket TTS 100M](https://huggingface.co/mlx-community/pocket-tts) | Lightweight | English | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 236 MB |
+| [Kokoro 82M](https://huggingface.co/mlx-community/Kokoro-82M-bf16) | Lightweight | English | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) | 389 MB |
+| [Chatterbox Turbo 350M](https://huggingface.co/mlx-community/chatterbox-turbo-4bit) | Balanced | English | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) | 417 MB |
+| [Qwen 0.6B](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit) | Heavy, highest quality | English | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) | 1.97 GB |
 
-| STT | Tier | Download |
-| --- | --- | ---: |
-| Moonshine Base 61M | Lightweight | 248 MB |
-| Parakeet 110M | Balanced | 459 MB |
-| Parakeet 0.6B v3 | Heavy, highest accuracy | 2.51 GB |
+| STT model card | Tier | Language | License | Download |
+| --- | --- | --- | --- | ---: |
+| [Moonshine Base 61M](https://huggingface.co/UsefulSensors/moonshine-base) | Lightweight | English | [MIT](https://opensource.org/license/mit) | 248 MB |
+| [Parakeet 110M](https://huggingface.co/mlx-community/parakeet-tdt_ctc-110m) | Balanced | English | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 459 MB |
+| [Parakeet 0.6B v3](https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3) | Heavy, highest accuracy | 25 languages | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 2.51 GB |
+
+The built-in TTS paths are currently English-only. Moonshine and Parakeet 110M
+are English transcription models; choose Parakeet 0.6B v3 for multilingual
+transcription. Follow each model card for its upstream limitations and license
+terms.
 
 Some MLX Audio speech implementations reuse `mlx-lm` cache and sampling
 utilities internally. VoiceBridge does not load a local reasoning or
@@ -54,10 +62,37 @@ at a time. A machine-wide advisory lock prevents Codex, Claude Code, or direct
 development sessions from interfering with one another. Speech playback and
 microphone capture are also serialized; there is no echo cancellation.
 
+## Requirements
+
+Before installing, confirm that the Mac has:
+
+- Apple Silicon and macOS 14 or newer.
+- Python 3.11 through 3.14 available on `PATH`.
+- A working microphone and audio output device, with microphone permission for
+  the host application.
+- Internet access for the initial locked dependency install and selected model
+  downloads.
+- Disk space for a private Python environment plus the selected model pair.
+  Model weights range from about 484 MB to 4.48 GB; the default Pocket TTS and
+  Parakeet 110M pair is about 695 MB. Cached models are shared with other local
+  Hugging Face applications.
+
+## Privacy boundary
+
+Microphone access begins only after the user explicitly invokes Voice Code.
+Raw audio is held in memory for local STT and is not saved by VoiceBridge; TTS
+also runs locally. The resulting transcript is handed to Codex or Claude Code,
+which may process and retain it under that host's separate settings and privacy
+policy. VoiceBridge has no telemetry and does not send recordings or
+transcripts to its developer. Initial dependency and model downloads do contact
+their package hosts. See [PRIVACY.md](PRIVACY.md) for details and local storage
+locations.
+
 ## Install for Codex
 
-VoiceBridge works in the Codex CLI, desktop app, and IDE extension. Add this
-repository as a marketplace and install the plugin from a terminal:
+VoiceBridge works in the Codex CLI and desktop app. The Codex IDE extension does
+not currently support plugins. Add this repository as a marketplace and install
+the plugin from a terminal:
 
 ```bash
 codex plugin marketplace add michael-L-i/voicebridge
@@ -112,14 +147,15 @@ runtime version and capture settings so stale sessions are detected explicitly.
 
 ## First run
 
-The first start creates a private Python environment. Before any model download,
-Voice Code asks the user to choose one TTS and one STT tier, with Pocket and
-Parakeet preselected. It then asks macOS for microphone access and validates
-audio before downloading only that pair. Model downloads can take several
-minutes; low disk space is reported as a warning. Existing installations keep
-their current configuration and skip the chooser. Use VoiceBridge Settings to
-open the same model selectors again at any time; after confirmation, it stops
-an active voice session before applying the new pair.
+The plugin's first MCP start downloads locked Python dependencies into a private
+environment. Before any model download, Voice Code asks the user to choose one
+TTS and one STT tier, with Pocket and Parakeet 110M preselected. It then asks
+macOS for microphone access and validates audio before downloading only that
+pair from Hugging Face. Setup can take several minutes; low disk space is
+reported as a warning. Existing installations keep their current configuration
+and skip the chooser. Use VoiceBridge Settings to open the same model selectors
+again at any time; after confirmation, it stops an active voice session before
+applying the new pair.
 
 Kokoro's English text pipeline is installed with the private environment. It
 does not install Python packages or require network access during synthesis;
@@ -176,20 +212,62 @@ For example, VoiceBridge's current Qwen and Parakeet repositories appear as
 `models--mlx-community--parakeet-tdt_ctc-110m`. Avoid deleting the whole
 Hugging Face cache: it is shared with other local applications.
 
-Removing the Codex plugin does not delete `~/.voicebridge`. To remove its Codex
-configuration and private Python environment as well, delete that directory
-manually after stopping every VoiceBridge session.
+## Troubleshooting
+
+- **No microphone or output:** allow microphone access for Codex or Claude Code
+  in macOS **System Settings > Privacy & Security > Microphone**, verify the
+  `[audio]` device settings, then restart the host.
+- **Setup or model download fails:** confirm the supported Python version,
+  internet access, and free disk space, then restart the host to retry. A failed
+  dependency rebuild leaves the previous environment unchanged.
+- **Session already in use:** stop Voice Code in every Codex, Claude Code, and
+  development session. Only one process can own the audio session.
+- **An update still reports the old version:** fully exit every host process
+  that loaded VoiceBridge and start a new one; running MCP processes are not
+  replaced in place.
+
+For a checkout-based diagnosis, run `uv run --locked voicebridge doctor`. Use
+`uv run --locked voicebridge listen-test` for a manual microphone test.
+
+## Uninstall
+
+Stop every VoiceBridge session first. For Codex:
+
+```bash
+codex plugin remove voicebridge@voicebridge-marketplace
+codex plugin marketplace remove voicebridge-marketplace
+```
+
+Codex removal leaves configuration and the private environment in
+`~/.voicebridge`; remove that directory manually if the data is no longer
+wanted.
+
+For Claude Code:
+
+```bash
+claude plugin uninstall voicebridge@voicebridge-marketplace
+claude plugin marketplace remove voicebridge-marketplace
+```
+
+Claude Code prompts about its persistent plugin data during uninstall; do not
+choose `--keep-data` if configuration and the private environment should also be
+removed. Model weights remain in the shared Hugging Face cache for both hosts;
+use the targeted cache commands above to inspect and remove only unwanted
+repositories.
 
 ## Development
 
 VoiceBridge supports Apple Silicon Macs running macOS 14 or newer and Python
 3.11 through 3.14. Newer Python versions are added after their MLX dependency
-stack is available and validated.
+stack is available and validated. `uv.lock` is the source of truth for local
+development and CI.
 
 ```bash
-python -m pip install -e .
-voicebridge doctor
-voicebridge listen-test
+uv lock --check
+uv sync --locked --python 3.13
+uv run --locked voicebridge doctor
+uv run --locked voicebridge listen-test
+uv run --locked python scripts/validate_plugin.py
 ./dev check
 ./dev inspector
 ./dev claude
@@ -198,6 +276,9 @@ voicebridge listen-test
 ./dev codex --fresh
 ./dev reset
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before intentionally changing the lock or
+its production `requirements.lock` export.
 
 The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
 `voice_speak`, `voice_listen`, `voice_interrupt`, `voice_stop`, and

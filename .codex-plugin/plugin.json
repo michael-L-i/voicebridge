@@ -44,6 +44,7 @@
       "Interactive"
     ],
     "websiteURL": "https://github.com/michael-L-i/voicebridge",
+    "privacyPolicyURL": "https://github.com/michael-L-i/voicebridge/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Start a local voice coding conversation.",
       "Choose VoiceBridge speech and transcription models."
