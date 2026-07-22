@@ -22,6 +22,9 @@ There is no passive narration. Users explicitly start Voice Code with
   `voice_speak`.
 - The host calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
+- After interrupting a host turn with Escape, the user can invoke the explicit
+  interrupt workflow. `voice_interrupt` silences current audio, opens a fresh
+  capture, and returns added guidance without unloading the models.
 - The host calls `voice_speak` again with a short spoken-style update, and the
   loop repeats until the user says something like "stop" or two consecutive
   `voice_listen` calls time out.
@@ -48,6 +51,7 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
 - `skills/voice-code/`: explicit Codex `$voice-code` workflow.
+- `skills/voice-interrupt/`: explicit Codex `$voice-interrupt` recovery flow.
 - `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
   under `VOICEBRIDGE_DATA_DIR` on first run (or after a dependency change),
   then `exec`s into the real `voicebridge-mcp` entrypoint inside it. Claude Code
@@ -55,8 +59,8 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
-- `commands/voice-code.md`: the `/voicebridge:voice-code` slash command
-  (namespaced to the plugin name automatically by Claude Code).
+- `commands/voice-code.md` and `commands/voice-interrupt.md`: the corresponding
+  Claude Code slash commands, namespaced to the plugin automatically.
 
 ## Important Paths
 
@@ -85,8 +89,8 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   string. TTS providers are Pocket TTS, Kokoro, Chatterbox Turbo, and Qwen
   0.6B; STT providers are Moonshine Base, Parakeet 110M, and Parakeet 0.6B.
 - `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_models`,
-  `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`, `voice_stop`,
-  and `voice_status`.
+  `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`,
+  `voice_interrupt`, `voice_stop`, and `voice_status`.
 - `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
   machine-wide session lock. Only one VoiceBridge conversation across either
   host can use the audio devices and model memory at a time. Status includes
@@ -106,8 +110,8 @@ python -m unittest discover -s tests -v
 
 For behavioral changes, run the unit tests plus the narrowest relevant manual
 check, usually `voicebridge doctor`, `voicebridge listen-test`, or a direct
-`voice_start`/`voice_speak`/`voice_listen`/`voice_stop` sequence through a real
-Codex or Claude Code MCP client session.
+`voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop`
+sequence through a real Codex or Claude Code MCP client session.
 
 ## Visible Plugin Test Sessions
 

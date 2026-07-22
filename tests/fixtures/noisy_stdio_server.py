@@ -56,6 +56,9 @@ class _AllProvidersRuntime:
 
         return {"invoked": invoked}
 
+    def stop(self) -> dict:
+        return {"stopped": True}
+
 
 server.runtime = _AllProvidersRuntime()
 server.main()

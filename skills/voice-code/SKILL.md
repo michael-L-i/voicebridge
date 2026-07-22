@@ -68,3 +68,7 @@ Maintain two outputs for completed work:
 After `voice_start` succeeds, call `voice_stop` exactly once at the end and
 never between turns. Keep speech brief unless the user explicitly requests a
 spoken walkthrough.
+
+If the user presses Escape during a turn, they can invoke `$voice-interrupt` to
+silence current VoiceBridge audio and add spoken guidance without unloading the
+models. The separate interrupt skill owns that recovery workflow.
