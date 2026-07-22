@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -51,6 +52,10 @@ case " $* " in
     exit 43
     ;;
   *" --require-hashes "*)
+    printf 'install\n' >> "$INSTALL_LOG"
+    if [ -n "${LOCK_INSTALL_DELAY:-}" ]; then
+      sleep "$LOCK_INSTALL_DELAY"
+    fi
     if [ "${FAIL_LOCK_INSTALL:-0}" = "1" ]; then
       exit 42
     fi
@@ -59,7 +64,9 @@ esac
 exit 0
 """
         )
-        fake_server.write_text("#!/bin/bash\nexit 0\n")
+        fake_server.write_text(
+            "#!/bin/bash\nprintf 'server\\n' >> \"$SERVER_EXEC_LOG\"\nexit 0\n"
+        )
         fake_mv.write_text(
             f"""#!/bin/bash
 previous=""
@@ -104,6 +111,8 @@ exec {shutil.which("mv")} "$@"
             "FAKE_SERVER": str(fake_server),
             "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
             "PIP_CALLS": str(root / "pip-calls"),
+            "INSTALL_LOG": str(root / "install.log"),
+            "SERVER_EXEC_LOG": str(root / "server.log"),
         }
         return plugin / "bin/voicebridge-mcp-bootstrap", data, environment
 
@@ -113,6 +122,14 @@ exec {shutil.which("mv")} "$@"
         return subprocess.run(
             [str(bootstrap)], env=environment, capture_output=True, text=True
         )
+
+    def _wait_for_install(self, environment: dict[str, str]) -> None:
+        install_log = Path(environment["INSTALL_LOG"])
+        deadline = time.monotonic() + 5
+        while not install_log.exists():
+            if time.monotonic() >= deadline:
+                self.fail("bootstrap did not start its locked install")
+            time.sleep(0.01)
 
     def _seed_legacy_environment(self, data: Path) -> Path:
         legacy = data / "venv"
@@ -141,6 +158,7 @@ exec {shutil.which("mv")} "$@"
             self.assertTrue((data / "venv").is_symlink())
             self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
             self.assertTrue((data / "venv/.voicebridge-install-marker").is_file())
+            self.assertEqual(result.stdout, "")
             self._assert_only_active_environment_remains(data)
 
     def test_update_replaces_symlink_and_removes_old_target(self):
@@ -177,6 +195,120 @@ exec {shutil.which("mv")} "$@"
             self.assertEqual((data / "venv").resolve(), old_target)
             self.assertTrue((old_target / "bin/voicebridge-mcp").is_file())
             self._assert_only_active_environment_remains(data)
+
+    def test_concurrent_callers_share_one_install_and_both_run_server(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+            environment["LOCK_INSTALL_DELAY"] = "0.5"
+
+            first = subprocess.Popen(
+                [str(bootstrap)],
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self._wait_for_install(environment)
+            second = subprocess.Popen(
+                [str(bootstrap)],
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            first_stdout, first_stderr = first.communicate(timeout=10)
+            second_stdout, second_stderr = second.communicate(timeout=10)
+
+            self.assertEqual(first.returncode, 0, first_stderr)
+            self.assertEqual(second.returncode, 0, second_stderr)
+            self.assertEqual(first_stdout, "")
+            self.assertEqual(second_stdout, "")
+            self.assertEqual(
+                Path(environment["INSTALL_LOG"]).read_text().splitlines(),
+                ["install"],
+            )
+            self.assertEqual(
+                Path(environment["SERVER_EXEC_LOG"]).read_text().splitlines(),
+                ["server", "server"],
+            )
+            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertFalse((data / ".venv-install.lock").exists())
+
+    def test_failed_installer_releases_waiter_to_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+            failing_environment = {**environment, "FAIL_LOCK_INSTALL": "1"}
+            failing_environment["LOCK_INSTALL_DELAY"] = "0.5"
+
+            first = subprocess.Popen(
+                [str(bootstrap)],
+                env=failing_environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self._wait_for_install(environment)
+            second = subprocess.Popen(
+                [str(bootstrap)],
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            first_stdout, first_stderr = first.communicate(timeout=10)
+            second_stdout, second_stderr = second.communicate(timeout=10)
+
+            self.assertNotEqual(first.returncode, 0, first_stderr)
+            self.assertEqual(second.returncode, 0, second_stderr)
+            self.assertEqual(first_stdout, "")
+            self.assertEqual(second_stdout, "")
+            self.assertEqual(
+                Path(environment["INSTALL_LOG"]).read_text().splitlines(),
+                ["install", "install"],
+            )
+            self.assertEqual(
+                Path(environment["SERVER_EXEC_LOG"]).read_text().splitlines(),
+                ["server"],
+            )
+            self.assertFalse((data / ".venv-install.lock").exists())
+
+    def test_stale_installer_lock_is_recovered_without_pruning_builds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+            lock = data / ".venv-install.lock"
+            lock.mkdir(parents=True)
+            (lock / "owner").write_text("999999|stale process|dead-token\n")
+            orphan_build = data / ".venv-build.orphan"
+            orphan_build.mkdir()
+
+            result = self._run(bootstrap, environment)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("recovered a stale installer lock", result.stderr)
+            self.assertTrue(orphan_build.is_dir())
+            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertFalse(lock.exists())
+
+    def test_incomplete_installer_lock_from_early_crash_is_recovered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+            lock = data / ".venv-install.lock"
+            lock.mkdir(parents=True)
+
+            result = subprocess.run(
+                [str(bootstrap)],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("recovered an incomplete installer lock", result.stderr)
+            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertFalse(lock.exists())
 
     def test_uses_bundled_pip_only_for_locked_runtime_and_local_project(self):
         with tempfile.TemporaryDirectory() as directory:
