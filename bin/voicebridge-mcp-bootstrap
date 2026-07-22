@@ -88,7 +88,8 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
   trap cleanup_install EXIT
 
   "${PYTHON_BIN}" -m venv "${BUILD_DIR}"
-  "${BUILD_DIR}/bin/pip" install --quiet --upgrade pip >&2
+  # venv seeds pip from this Python's bundled ensurepip. Use that installer
+  # rather than upgrading it from the network; runtime deps are hash-locked.
   # misaki 0.9.4 declares Python <3.13 even though the locked release is
   # exercised on 3.11-3.14 in CI; uv installs it across that supported matrix.
   if ! "${BUILD_DIR}/bin/pip" install --quiet --require-hashes \
