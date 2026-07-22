@@ -10,6 +10,14 @@
 # the final exec corrupts the protocol handshake the host expects.
 set -euo pipefail
 
+SETUP_ONLY=0
+if [ "${1:-}" = "--setup" ] && [ "$#" = "1" ]; then
+  SETUP_ONLY=1
+elif [ "$#" != "0" ]; then
+  echo "[voicebridge] ERROR: expected no arguments or --setup." >&2
+  exit 64
+fi
+
 PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 DATA_DIR="${VOICEBRIDGE_DEV_DATA_DIR:-${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}}"
 VENV_DIR="${DATA_DIR}/venv"
@@ -176,8 +184,8 @@ if ! environment_is_current; then
     exec "${VENV_DIR}/bin/voicebridge-mcp"
   fi
 
-  echo "[voicebridge] setting up local voice models -- first run only," \
-       "can take a few minutes (dependency install; model weights download" \
+  echo "[voicebridge] setting up local voice dependencies -- first run only," \
+       "can take a few minutes (model weights download" \
        "when voice mode starts for the first time)." >&2
 
   PYTHON_BIN="${VOICEBRIDGE_PYTHON:-}"
@@ -301,6 +309,10 @@ if ! environment_is_current; then
   release_install_lock
   trap - EXIT
   echo "[voicebridge] setup complete." >&2
+fi
+
+if [ "${SETUP_ONLY}" = "1" ]; then
+  exit 0
 fi
 
 exec "${VENV_DIR}/bin/voicebridge-mcp"

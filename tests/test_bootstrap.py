@@ -168,6 +168,23 @@ exec {shutil.which("mv")} "$@"
             self.assertEqual(result.stdout, "")
             self._assert_only_active_environment_remains(data)
 
+    def test_setup_only_prepares_environment_without_starting_mcp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+
+            result = subprocess.run(
+                [str(bootstrap), "--setup"],
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertFalse(Path(environment["SERVER_EXEC_LOG"]).exists())
+            self._assert_only_active_environment_remains(data)
+
     def test_update_replaces_symlink_and_removes_old_target(self):
         with tempfile.TemporaryDirectory() as directory:
             bootstrap, data, environment = self._fixture(Path(directory))

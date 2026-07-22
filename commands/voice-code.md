@@ -13,6 +13,12 @@ VoiceBridge is only speech input and output: it has no summarizer, conversation
 history, or background agent. Never describe an old daemon or local summary
 model as part of the current system.
 
+If the VoiceBridge MCP tools are unavailable or the server is still connecting,
+run `voicebridge-mcp-bootstrap --setup` with the Bash tool and wait for it to
+finish. Do not background it or retry it in parallel. On failure, show the
+error and end. On success, ask the user to run `/reload-plugins` and invoke
+`/voicebridge:voice-code` again, then end without attempting an MCP tool call.
+
 Use two distinct outputs for each completed request:
 
 - **Written:** Keep the useful technical detail in the normal Claude Code
