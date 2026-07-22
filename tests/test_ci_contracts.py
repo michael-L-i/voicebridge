@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 import tomllib
@@ -61,6 +62,26 @@ class CiContractTests(unittest.TestCase):
         self.assertNotIn("twine upload", workflow)
         self.assertNotIn("gh release create", workflow)
         self.assertNotIn("pypi", workflow.lower())
+
+    def test_codeql_scans_python_without_installing_apple_dependencies(self):
+        workflow = (ROOT / ".github/workflows/codeql.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("pull_request:", workflow)
+        self.assertIn("branches: [main]", workflow)
+        self.assertIn("schedule:", workflow)
+        self.assertIn("security-events: write", workflow)
+        self.assertIn("runs-on: ubuntu-latest", workflow)
+        self.assertIn("languages: python", workflow)
+        self.assertIn("build-mode: none", workflow)
+        self.assertNotIn("pip install", workflow)
+        self.assertNotIn("uv ", workflow)
+
+        action_refs = re.findall(r"uses: [^@\s]+@([^\s]+)", workflow)
+        self.assertTrue(action_refs)
+        for ref in action_refs:
+            self.assertRegex(ref, r"^[0-9a-f]{40}$")
 
     def test_production_requirements_are_hashed_and_lock_key_dependencies(self):
         requirements = (ROOT / "requirements.lock").read_text(encoding="utf-8")
