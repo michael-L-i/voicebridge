@@ -1,4 +1,5 @@
 import queue
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -38,7 +39,7 @@ _DEVICE_ERROR_MARKERS = (
     "portaudio error",
 )
 
-EndReason = Literal["silence", "timeout", "device_error"]
+EndReason = Literal["silence", "timeout", "device_error", "cancelled"]
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,10 @@ class _DeviceError:
     message: str
 
 
+class _CaptureCancelled(Exception):
+    pass
+
+
 def _device_arg(device: str | int | None) -> str | int | None:
     return None if device in (None, "default") else device
 
@@ -67,6 +72,7 @@ def listen(
     output_device: str | int | None = None,
     start_chime: bool = True,
     end_chime: bool = True,
+    cancel_event: threading.Event | None = None,
 ) -> ListenResult:
     """Capture one utterance with silence endpointing and a rolling deadline.
 
@@ -83,6 +89,14 @@ def listen(
     if max_listen_ms <= 0:
         raise ValueError("max_listen_ms must be positive")
 
+    cancelled = cancel_event or threading.Event()
+    if cancelled.is_set():
+        return ListenResult(
+            audio=np.zeros(0, dtype=np.float32),
+            speech_detected=False,
+            end_reason="cancelled",
+        )
+
     chunk_samples = int(sample_rate * _CHUNK_MS / 1000)
     settle_chunks = max(1, round(_SETTLE_MS / _CHUNK_MS))
     min_speech_chunks = max(1, round(_MIN_SPEECH_MS / _CHUNK_MS))
@@ -94,6 +108,8 @@ def listen(
     audio_queue: queue.Queue[np.ndarray | _DeviceError] = queue.Queue()
 
     def callback(indata, frames, time_info, status):
+        if cancelled.is_set():
+            return
         if status:
             status_text = str(status)
             if any(marker in status_text.lower() for marker in _DEVICE_ERROR_MARKERS):
@@ -113,9 +129,11 @@ def listen(
     with audio_lock:
         chime_started = False
         try:
-            if start_chime:
+            if start_chime and not cancelled.is_set():
                 play_chime_start(output_device)
                 chime_started = True
+            if cancelled.is_set():
+                raise _CaptureCancelled
             with sd.InputStream(
                 samplerate=sample_rate,
                 channels=1,
@@ -126,7 +144,14 @@ def listen(
             ):
                 settled_chunks = 0
                 settle_deadline = time.monotonic() + (_SETTLE_MS / 1000)
-                while settled_chunks < settle_chunks and time.monotonic() < settle_deadline:
+                while (
+                    end_reason != "cancelled"
+                    and settled_chunks < settle_chunks
+                    and time.monotonic() < settle_deadline
+                ):
+                    if cancelled.is_set():
+                        end_reason = "cancelled"
+                        break
                     remaining = settle_deadline - time.monotonic()
                     try:
                         item = audio_queue.get(timeout=min(_QUEUE_POLL_S, remaining))
@@ -140,7 +165,13 @@ def listen(
 
                 deadline = time.monotonic() + (max_listen_ms / 1000)
                 last_audio_at = time.monotonic()
-                while end_reason != "device_error" and time.monotonic() < deadline:
+                while (
+                    end_reason not in ("device_error", "cancelled")
+                    and time.monotonic() < deadline
+                ):
+                    if cancelled.is_set():
+                        end_reason = "cancelled"
+                        break
                     remaining = deadline - time.monotonic()
                     try:
                         item = audio_queue.get(timeout=min(_QUEUE_POLL_S, remaining))
@@ -189,17 +220,31 @@ def listen(
                     ):
                         end_reason = "silence"
                         break
+        except _CaptureCancelled:
+            end_reason = "cancelled"
         except Exception as exc:
-            end_reason = "device_error"
-            error = str(exc)
+            if cancelled.is_set():
+                end_reason = "cancelled"
+            else:
+                end_reason = "device_error"
+                error = str(exc)
         finally:
-            if end_chime and (chime_started or not start_chime):
+            if (
+                end_reason != "cancelled"
+                and end_chime
+                and (chime_started or not start_chime)
+            ):
                 try:
                     play_chime_end(output_device)
                 except Exception as exc:
                     end_reason = "device_error"
                     error = error or str(exc)
 
+    if cancelled.is_set():
+        chunks.clear()
+        speech_detected = False
+        end_reason = "cancelled"
+        error = None
     audio = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
     return ListenResult(
         audio=audio,
