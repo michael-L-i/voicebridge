@@ -121,6 +121,10 @@ their current configuration and skip the chooser. Use VoiceBridge Settings to
 open the same model selectors again at any time; after confirmation, it stops
 an active voice session before applying the new pair.
 
+Kokoro's English text pipeline is installed with the private environment. It
+does not install Python packages or require network access during synthesis;
+only the selected speech model weights may be downloaded when voice mode starts.
+
 ## Configuration
 
 The first run creates `config.toml`. Codex and direct development use

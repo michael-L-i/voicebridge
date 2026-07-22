@@ -45,6 +45,9 @@ dependencies = [
   # spaCy 3.8.14 omitted CPython 3.14 macOS ARM wheels. Keep the Python 3.14
   # compatible 3.8.9-3.8.13 range until upstream publishes a fixed release.
   "spacy>=3.8.9,<3.8.14",
+  # Misaki otherwise downloads this during the first Kokoro synthesis. Install
+  # the exact English pipeline during bootstrap so MCP calls never spawn pip.
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
   "num2words",
   "phonemizer-fork",
   "espeakng-loader",
