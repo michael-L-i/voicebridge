@@ -19,7 +19,12 @@ class BootstrapTests(unittest.TestCase):
             plugin / "bin/voicebridge-mcp-bootstrap",
         )
         (plugin / "pyproject.toml").write_text("[project]\nname = 'fixture'\n")
-        (plugin / "requirements.lock").write_text("fixture==1\n")
+        (plugin / "requirements.lock").write_text(
+            "fixture==1 \\\n"
+            "    --hash=sha256:fixture\n"
+            "misaki==0.9.4 \\\n"
+            "    --hash=sha256:misaki\n"
+        )
 
         fake_python = root / "fake-python"
         fake_pip = root / "fake-pip"
@@ -32,6 +37,8 @@ class BootstrapTests(unittest.TestCase):
 if [ "$1" = "-c" ]; then
   case "$2" in
     *os.path.realpath*) printf '%s\\n' "$0" ;;
+    *"raise SystemExit"*) exit "${FAKE_PYTHON_STATUS:-0}" ;;
+    *sys.version_info*) printf '%s\\n' "${FAKE_PYTHON_VERSION:-3.14.0}" ;;
   esac
   exit 0
 fi
@@ -51,7 +58,7 @@ case " $* " in
   *" --upgrade "*" pip "*)
     exit 43
     ;;
-  *" --require-hashes "*)
+  *"requirements.lock"*)
     printf 'install\n' >> "$INSTALL_LOG"
     if [ -n "${LOCK_INSTALL_DELAY:-}" ]; then
       sleep "$LOCK_INSTALL_DELAY"
@@ -320,13 +327,40 @@ exec {shutil.which("mv")} "$@"
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = Path(environment["PIP_CALLS"]).read_text().splitlines()
-            self.assertEqual(len(calls), 2)
-            self.assertIn("--require-hashes", calls[0])
-            self.assertIn("--ignore-requires-python", calls[0])
-            self.assertIn("requirements.lock", calls[0])
-            self.assertIn("--no-deps", calls[1])
-            self.assertIn(" -e ", f" {calls[1]} ")
+            self.assertEqual(len(calls), 3)
+            misaki_install = next(
+                command for command in calls if "misaki.lock" in command
+            )
+            locked_install = next(
+                command for command in calls if "requirements.lock" in command
+            )
+            project_install = next(
+                command for command in calls if " -e " in f" {command} "
+            )
+            self.assertIn("--require-hashes", misaki_install)
+            self.assertIn("--ignore-requires-python", misaki_install)
+            self.assertIn("--no-deps", misaki_install)
+            self.assertIn("--require-hashes", locked_install)
+            self.assertNotIn("--ignore-requires-python", locked_install)
+            self.assertIn("--no-deps", project_install)
             self.assertNotIn("--upgrade", " ".join(calls))
+
+    def test_python_3_15_is_rejected_before_environment_creation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bootstrap, data, environment = self._fixture(Path(directory))
+            environment["FAKE_PYTHON_STATUS"] = "1"
+            environment["FAKE_PYTHON_VERSION"] = "3.15.0"
+
+            result = subprocess.run(
+                [str(bootstrap)], env=environment, capture_output=True, text=True
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "Python 3.11 through 3.14 is required; found 3.15.0.",
+                result.stderr,
+            )
+            self.assertEqual(list(data.glob(".venv-build.*")), [])
 
     def test_failed_update_preserves_legacy_working_environment(self):
         with tempfile.TemporaryDirectory() as directory:

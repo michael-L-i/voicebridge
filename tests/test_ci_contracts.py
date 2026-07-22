@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class CiContractTests(unittest.TestCase):
+    def test_package_supports_only_the_tested_python_range(self):
+        with (ROOT / "pyproject.toml").open("rb") as file:
+            project = tomllib.load(file)["project"]
+
+        self.assertEqual(project["requires-python"], ">=3.11,<3.15")
+
     def test_ci_uses_locked_apple_silicon_validation(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -58,6 +65,19 @@ class CiContractTests(unittest.TestCase):
         self.assertIn("misaki==0.9.4", requirements)
         self.assertIn("huggingface-hub==1.23.0", requirements)
         self.assertIn("--hash=sha256:", requirements)
+
+    def test_bootstrap_scopes_the_misaki_metadata_workaround(self):
+        bootstrap = (ROOT / "bin/voicebridge-mcp-bootstrap").read_text(
+            encoding="utf-8"
+        )
+        install_lines = bootstrap.replace("\\\n", "").splitlines()
+        ignored = [
+            line for line in install_lines if "--ignore-requires-python" in line
+        ]
+
+        self.assertEqual(len(ignored), 1)
+        self.assertIn("--no-deps", ignored[0])
+        self.assertIn("MISAKI_REQUIREMENT", ignored[0])
 
     def test_plugin_validation_script_passes_for_this_checkout(self):
         result = subprocess.run(
