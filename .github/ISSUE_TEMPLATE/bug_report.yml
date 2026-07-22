@@ -23,17 +23,65 @@ body:
     attributes:
       label: VoiceBridge version
       description: Use the version reported by `voice_status` when possible.
-      placeholder: 0.3.0
+      placeholder: Output of voice_status
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      description: Which coding agent was running VoiceBridge?
+      options:
+        - Codex
+        - Claude Code
     validations:
       required: true
   - type: input
-    id: environment
+    id: host_version
     attributes:
-      label: Environment
-      description: Include macOS version, Mac model/chip, Python version, and Claude Code version.
-      placeholder: macOS 15.x, MacBook Pro M3, Python 3.12.x, Claude Code x.y.z
+      label: Host version
+      description: Use the version reported by `codex --version` or `claude --version`.
+      placeholder: Host name and version
     validations:
       required: true
+  - type: input
+    id: install_context
+    attributes:
+      label: Release or local install context
+      description: For a release, include its tag or install source. For a local checkout, include the branch and short commit.
+      placeholder: GitHub release vX.Y.Z, or local branch-name at abc1234
+    validations:
+      required: true
+  - type: textarea
+    id: system
+    attributes:
+      label: macOS and hardware
+      description: Include all three details below.
+      placeholder: |
+        macOS version:
+        Mac model/chip:
+        Python version:
+    validations:
+      required: true
+  - type: textarea
+    id: models
+    attributes:
+      label: Selected speech models
+      description: Use the configured model names reported by VoiceBridge when possible.
+      placeholder: |
+        TTS model:
+        STT model:
+    validations:
+      required: true
+  - type: textarea
+    id: audio
+    attributes:
+      label: Audio devices (if relevant)
+      description: Include input/output device names, whether they are default or explicitly configured, and any Bluetooth, USB, sample-rate, or routing details related to the bug.
+      placeholder: |
+        Input device:
+        Output device:
+        Other relevant audio details:
   - type: textarea
     id: problem
     attributes:
@@ -57,8 +105,3 @@ body:
       label: Relevant logs
       description: Paste a short redacted excerpt. Never attach private transcripts, recordings, tokens, or credentials.
       render: shell
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional context
-      description: Include audio device or non-default configuration details when relevant.

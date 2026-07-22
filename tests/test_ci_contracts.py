@@ -99,6 +99,36 @@ class CiContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_bug_report_collects_both_host_and_voice_context(self):
+        form = (ROOT / ".github/ISSUE_TEMPLATE/bug_report.yml").read_text(
+            encoding="utf-8"
+        )
+
+        for field_id in (
+            "version",
+            "host",
+            "host_version",
+            "install_context",
+            "system",
+            "models",
+            "audio",
+        ):
+            self.assertIn(f"    id: {field_id}\n", form)
+        for detail in (
+            "Codex",
+            "Claude Code",
+            "macOS version:",
+            "Mac model/chip:",
+            "Python version:",
+            "TTS model:",
+            "STT model:",
+        ):
+            self.assertIn(detail, form)
+        self.assertNotIn("placeholder: 0.3.0", form)
+        self.assertNotIn("id: environment", form)
+        self.assertIn("private reporting link in SECURITY.md", form)
+        self.assertIn("Never attach private transcripts", form)
+
 
 if __name__ == "__main__":
     unittest.main()
