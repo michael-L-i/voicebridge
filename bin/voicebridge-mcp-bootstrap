@@ -14,6 +14,8 @@ PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 DATA_DIR="${VOICEBRIDGE_DEV_DATA_DIR:-${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}}"
 VENV_DIR="${DATA_DIR}/venv"
 MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
+INSTALL_LOCK_DIR="${DATA_DIR}/.venv-install.lock"
+INSTALL_LOCK_OWNER="${INSTALL_LOCK_DIR}/owner"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
 REQUIREMENTS="${PLUGIN_ROOT}/requirements.lock"
 
@@ -39,14 +41,141 @@ fi
 CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" "${REQUIREMENTS}" | \
   awk '{print $1}' | shasum -a 256 | awk '{print $1}')
 
-NEEDS_INSTALL=1
-if [ -x "${VENV_DIR}/bin/voicebridge-mcp" ] && \
-   [ -f "${MARKER_FILE}" ] && \
-   [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]; then
-  NEEDS_INSTALL=0
-fi
+environment_is_current() {
+  [ -x "${VENV_DIR}/bin/voicebridge-mcp" ] && \
+    [ -f "${MARKER_FILE}" ] && \
+    [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]
+}
 
-if [ "${NEEDS_INSTALL}" = "1" ]; then
+process_started_at() {
+  ps -p "$1" -o lstart= 2>/dev/null | awk '{$1=$1; print}'
+}
+
+LOCK_TOKEN="$$.${RANDOM}.$(date +%s)"
+LOCK_STARTED_AT=$(process_started_at "$$")
+LOCK_RECORD="$$|${LOCK_STARTED_AT}|${LOCK_TOKEN}"
+HAVE_INSTALL_LOCK=0
+
+release_install_lock() {
+  if [ "${HAVE_INSTALL_LOCK}" = "1" ] && \
+     [ -f "${INSTALL_LOCK_OWNER}" ] && \
+     [ "$(cat "${INSTALL_LOCK_OWNER}" 2>/dev/null || true)" = "${LOCK_RECORD}" ]; then
+    rm -- "${INSTALL_LOCK_OWNER}"
+    rmdir "${INSTALL_LOCK_DIR}" 2>/dev/null || true
+  fi
+  HAVE_INSTALL_LOCK=0
+}
+
+reap_install_lock() {
+  EXPECTED_OWNER=$1
+  RECOVERY_MESSAGE=$2
+  CLAIMED_OWNER="${INSTALL_LOCK_OWNER}.reaping.${LOCK_TOKEN}"
+
+  if [ -e "${INSTALL_LOCK_OWNER}" ]; then
+    if [ "$(cat "${INSTALL_LOCK_OWNER}" 2>/dev/null || true)" != \
+       "${EXPECTED_OWNER}" ] || \
+       ! mv "${INSTALL_LOCK_OWNER}" "${CLAIMED_OWNER}" 2>/dev/null; then
+      return 1
+    fi
+    if [ "$(cat "${CLAIMED_OWNER}" 2>/dev/null || true)" != \
+         "${EXPECTED_OWNER}" ]; then
+      if [ ! -e "${INSTALL_LOCK_OWNER}" ]; then
+        mv "${CLAIMED_OWNER}" "${INSTALL_LOCK_OWNER}" 2>/dev/null || true
+      fi
+      return 1
+    fi
+  fi
+
+  # A crashed reaper can leave one of these claims behind. They are lock
+  # metadata only; build directories are deliberately never swept here.
+  for ABANDONED_CLAIM in "${INSTALL_LOCK_OWNER}".reaping.*; do
+    if [ -f "${ABANDONED_CLAIM}" ]; then
+      rm -- "${ABANDONED_CLAIM}"
+    fi
+  done
+  if rmdir "${INSTALL_LOCK_DIR}" 2>/dev/null; then
+    echo "${RECOVERY_MESSAGE}" >&2
+    return 0
+  fi
+  return 1
+}
+
+acquire_install_lock() {
+  WAITING_FOR_LOCK=0
+  INCOMPLETE_OWNER_ROUNDS=0
+
+  while ! mkdir "${INSTALL_LOCK_DIR}" 2>/dev/null; do
+    OWNER_RECORD=$(cat "${INSTALL_LOCK_OWNER}" 2>/dev/null || true)
+    OWNER_PID=${OWNER_RECORD%%|*}
+    OWNER_REMAINDER=${OWNER_RECORD#*|}
+    OWNER_STARTED_AT=${OWNER_REMAINDER%%|*}
+    OWNER_TOKEN=${OWNER_REMAINDER#*|}
+    OWNER_IS_VALID=1
+    case "${OWNER_PID}" in
+      ""|*[!0-9]*) OWNER_IS_VALID=0 ;;
+    esac
+    if [ "${OWNER_REMAINDER}" = "${OWNER_RECORD}" ] || \
+       [ "${OWNER_TOKEN}" = "${OWNER_REMAINDER}" ] || \
+       [ -z "${OWNER_STARTED_AT}" ] || [ -z "${OWNER_TOKEN}" ]; then
+      OWNER_IS_VALID=0
+    fi
+
+    OWNER_IS_ACTIVE=0
+    if [ "${OWNER_IS_VALID}" = "1" ] && \
+       kill -0 "${OWNER_PID}" 2>/dev/null && \
+       [ "$(process_started_at "${OWNER_PID}")" = "${OWNER_STARTED_AT}" ]; then
+      OWNER_IS_ACTIVE=1
+    fi
+
+    if [ "${OWNER_IS_ACTIVE}" = "1" ]; then
+      INCOMPLETE_OWNER_ROUNDS=0
+    elif [ "${OWNER_IS_VALID}" = "1" ]; then
+      # Moving the inspected record is an atomic claim: only one waiter can
+      # reap it, and no reaper ever removes a later owner's record.
+      if reap_install_lock "${OWNER_RECORD}" \
+           "[voicebridge] recovered a stale installer lock."; then
+        continue
+      fi
+    else
+      # mkdir and the owner write cannot be one operation in stock Bash. Give
+      # a live acquirer time to publish its record before pruning an incomplete
+      # lock left by a crash in that tiny window.
+      INCOMPLETE_OWNER_ROUNDS=$((INCOMPLETE_OWNER_ROUNDS + 1))
+      if [ "${INCOMPLETE_OWNER_ROUNDS}" -ge 5 ]; then
+        if reap_install_lock "${OWNER_RECORD}" \
+             "[voicebridge] recovered an incomplete installer lock."; then
+          continue
+        fi
+        INCOMPLETE_OWNER_ROUNDS=0
+      fi
+    fi
+
+    if [ "${WAITING_FOR_LOCK}" = "0" ]; then
+      echo "[voicebridge] waiting for another VoiceBridge setup to finish." >&2
+      WAITING_FOR_LOCK=1
+    fi
+    sleep 1
+  done
+
+  if ! printf '%s\n' "${LOCK_RECORD}" > "${INSTALL_LOCK_OWNER}"; then
+    rmdir "${INSTALL_LOCK_DIR}" 2>/dev/null || true
+    echo "[voicebridge] ERROR: could not record installer lock ownership." >&2
+    exit 1
+  fi
+  HAVE_INSTALL_LOCK=1
+  trap release_install_lock EXIT
+}
+
+if ! environment_is_current; then
+  acquire_install_lock
+
+  # Another caller may have completed setup while this process waited.
+  if environment_is_current; then
+    release_install_lock
+    trap - EXIT
+    exec "${VENV_DIR}/bin/voicebridge-mcp"
+  fi
+
   echo "[voicebridge] setting up local voice models -- first run only," \
        "can take a few minutes (dependency install; model weights download" \
        "when voice mode starts for the first time)." >&2
@@ -84,6 +213,7 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
     if [ -n "${BUILD_DIR}" ] && [ -d "${BUILD_DIR}" ]; then
       rm -rf -- "${BUILD_DIR}"
     fi
+    release_install_lock
   }
   trap cleanup_install EXIT
 
@@ -135,6 +265,7 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
       rm -rf -- "${OLD_TARGET}"
       ;;
   esac
+  release_install_lock
   trap - EXIT
   echo "[voicebridge] setup complete." >&2
 fi
