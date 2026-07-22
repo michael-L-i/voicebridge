@@ -90,3 +90,8 @@ it, not the full written response. If the user explicitly asks for a spoken
 walkthrough, use a little more detail while keeping it natural. Once
 `voice_start` succeeds, call `voice_stop` exactly once at the end, never between
 turns.
+
+If the user presses Escape during a turn, they can invoke
+`/voicebridge:voice-interrupt` to silence current VoiceBridge audio and add
+spoken guidance without unloading the models. That separate command owns the
+interrupt recovery workflow.

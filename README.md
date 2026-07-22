@@ -196,11 +196,15 @@ voicebridge listen-test
 ```
 
 The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
-`voice_speak`, `voice_listen`, `voice_stop`, and `voice_status`.
+`voice_speak`, `voice_listen`, `voice_interrupt`, `voice_stop`, and
+`voice_status`.
 `voice_models` reports the ordered local choices without downloading them, and
 `voice_configure` persists a pair before a voice session begins. `voice_speak`
 always plays the exact text the host supplies; it never rewrites or summarizes
-that text locally. `voice_status` reports the host, first-run state, running
+that text locally. After stopping the host's current turn with Escape,
+`voice_interrupt` immediately silences current audio and captures added spoken
+guidance without unloading the models. `voice_status` reports the host,
+first-run state, running
 package version, and effective endpointing settings, which is useful for
 confirming an update actually restarted the MCP process.
 

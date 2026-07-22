@@ -116,9 +116,9 @@ voicebridge listen-test
 ```
 
 A full voice-mode change should be exercised through
-`voice_start`/`voice_speak`/`voice_listen`/`voice_stop` in a real Claude Code
-session. Note what you tested in the pull request; do not attach recordings
-unless everyone captured in them has consented.
+`voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop` in a
+real Claude Code session. Note what you tested in the pull request; do not
+attach recordings unless everyone captured in them has consented.
 
 ## Pull requests
 

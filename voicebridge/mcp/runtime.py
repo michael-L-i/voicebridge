@@ -19,6 +19,7 @@ from voicebridge.config import (
 
 SESSION_LOCK_PATH = Path.home() / ".voicebridge" / "active-session.lock"
 _ONBOARDING_MARKER = "onboarding-v1.complete"
+_CANCEL_WAIT_S = 3.0
 
 
 class VoiceSessionBusy(RuntimeError):
@@ -34,8 +35,9 @@ class _QueuedCapture:
 
 
 class _QueuedListen:
-    def __init__(self, target: Callable[[], Any]) -> None:
+    def __init__(self, target: Callable[[threading.Event], Any]) -> None:
         self._target = target
+        self._cancelled = threading.Event()
         self._result: Any = None
         self._error: Exception | None = None
         self._thread = threading.Thread(
@@ -49,12 +51,17 @@ class _QueuedListen:
 
     def _run(self) -> None:
         try:
-            self._result = self._target()
+            self._result = self._target(self._cancelled)
         except Exception as exc:
             self._error = exc
 
-    def wait(self) -> Any:
-        self._thread.join()
+    def cancel(self) -> None:
+        self._cancelled.set()
+
+    def wait(self, timeout: float | None = None) -> Any:
+        self._thread.join(timeout)
+        if self._thread.is_alive():
+            raise TimeoutError("queued microphone capture did not stop")
         if self._error is not None:
             raise self._error
         if self._result is None:
@@ -75,6 +82,8 @@ class VoiceRuntime:
         self._tts: Any = None
         self._stt: Any = None
         self._playback: Any = None
+        self._capture_cancel: threading.Event | None = None
+        self._activity_lock = threading.Lock()
         self._queued_listen: _QueuedListen | None = None
         self._queued_listen_lock = threading.Lock()
 
@@ -150,11 +159,13 @@ class VoiceRuntime:
             started_at = time.monotonic()
             audio = self._tts.synthesize(spoken_text, voice=voice)
             synthesis_ms = int((time.monotonic() - started_at) * 1000)
-            self._playback = play_async(
+            playback = play_async(
                 audio,
                 self._tts.sample_rate,
                 device=self.config.audio.output_device,
             )
+            with self._activity_lock:
+                self._playback = playback
             if listen_after:
                 queued_listen = _QueuedListen(self._run_queued_capture)
                 with self._queued_listen_lock:
@@ -166,7 +177,7 @@ class VoiceRuntime:
                     (audio.shape[0] / self._tts.sample_rate) * 1000
                 ),
                 "synthesis_ms": synthesis_ms,
-                "playback_started": self._playback is not None,
+                "playback_started": playback is not None,
                 "listen_queued": listen_after,
             }
 
@@ -194,22 +205,66 @@ class VoiceRuntime:
             return self._listen_locked(timeout_ms, silence_ms)
 
     def stop(self) -> dict:
+        stopped = self.ready or self._session_lock_file is not None
         with self._queued_listen_lock:
             queued_listen = self._queued_listen
             self._queued_listen = None
         if queued_listen is not None:
+            queued_listen.cancel()
+        self._cancel_active_audio()
+        if queued_listen is not None:
             try:
-                queued_listen.wait()
+                queued_listen.wait(timeout=_CANCEL_WAIT_S)
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    "microphone capture did not stop during voice_stop"
+                ) from exc
             except Exception:
                 pass
 
         with self._operation_lock:
-            stopped = self.ready or self._session_lock_file is not None
+            release_session = True
             try:
-                self._wait_for_playback()
+                self._cancel_active_audio()
+                self._wait_for_playback(timeout=_CANCEL_WAIT_S)
+            except TimeoutError:
+                release_session = False
+                raise
             finally:
-                self._release_locked()
+                if release_session:
+                    self._release_locked()
             return {"stopped": stopped}
+
+    def interrupt(
+        self,
+        timeout_ms: int | None = None,
+        silence_ms: int | None = None,
+    ) -> dict:
+        """Cancel current audio and capture fresh guidance for this session."""
+        if not self.ready:
+            raise RuntimeError(
+                "voice_interrupt requires an active Voice Code session; "
+                "start Voice Code first"
+            )
+
+        with self._queued_listen_lock:
+            queued_listen = self._queued_listen
+            self._queued_listen = None
+        if queued_listen is not None:
+            queued_listen.cancel()
+        self._cancel_active_audio()
+        if queued_listen is not None:
+            queued_listen.wait(timeout=_CANCEL_WAIT_S)
+
+        with self._operation_lock:
+            if not self.ready:
+                raise RuntimeError("the Voice Code session stopped during interruption")
+            self._cancel_active_audio()
+            self._wait_for_playback(timeout=_CANCEL_WAIT_S)
+            return {
+                **self._listen_locked(timeout_ms, silence_ms),
+                "interrupted": True,
+            }
 
     def status(
         self,
@@ -282,30 +337,75 @@ class VoiceRuntime:
         if not self.ready:
             self.start()
 
-    def _wait_for_playback(self) -> None:
-        playback = self._playback
-        self._playback = None
+    def _wait_for_playback(self, timeout: float | None = None) -> None:
+        with self._activity_lock:
+            playback = self._playback
         if playback is not None:
-            playback.wait()
+            try:
+                if timeout is None:
+                    playback.wait()
+                else:
+                    playback.wait(timeout=timeout)
+            except TimeoutError:
+                raise
+            except Exception:
+                with self._activity_lock:
+                    if self._playback is playback:
+                        self._playback = None
+                raise
+            else:
+                with self._activity_lock:
+                    if self._playback is playback:
+                        self._playback = None
 
-    def _run_queued_capture(self) -> _QueuedCapture:
+    def _cancel_active_audio(self) -> None:
+        """Signal audio workers without waiting for the operation lock."""
+        with self._activity_lock:
+            playback = self._playback
+            capture_cancel = self._capture_cancel
+        if capture_cancel is not None:
+            capture_cancel.set()
+        if playback is not None:
+            playback.cancel()
+
+    def _begin_capture(
+        self, cancel_event: threading.Event | None = None
+    ) -> threading.Event:
+        cancel_event = cancel_event or threading.Event()
+        with self._activity_lock:
+            self._capture_cancel = cancel_event
+        return cancel_event
+
+    def _end_capture(self, cancel_event: threading.Event) -> None:
+        with self._activity_lock:
+            if self._capture_cancel is cancel_event:
+                self._capture_cancel = None
+
+    def _run_queued_capture(
+        self, queued_cancel: threading.Event
+    ) -> _QueuedCapture:
         with self._operation_lock:
             self._ensure_started()
-            self._wait_for_playback()
-            from voicebridge.audio.capture import listen
+            cancel_event = self._begin_capture(queued_cancel)
+            try:
+                self._wait_for_playback()
+                from voicebridge.audio.capture import listen
 
-            timeout_ms = self.config.stt.max_listen_ms
-            silence_ms = self.config.stt.silence_ms
-            started_at = time.monotonic()
-            result = listen(
-                self._stt.sample_rate,
-                silence_ms=silence_ms,
-                max_listen_ms=timeout_ms,
-                input_device=self.config.audio.input_device,
-                output_device=self.config.audio.output_device,
-                start_chime=True,
-                end_chime=False,
-            )
+                timeout_ms = self.config.stt.max_listen_ms
+                silence_ms = self.config.stt.silence_ms
+                started_at = time.monotonic()
+                result = listen(
+                    self._stt.sample_rate,
+                    silence_ms=silence_ms,
+                    max_listen_ms=timeout_ms,
+                    input_device=self.config.audio.input_device,
+                    output_device=self.config.audio.output_device,
+                    start_chime=True,
+                    end_chime=False,
+                    cancel_event=cancel_event,
+                )
+            finally:
+                self._end_capture(cancel_event)
             return _QueuedCapture(
                 result=result,
                 started_at=started_at,
@@ -321,7 +421,6 @@ class VoiceRuntime:
         queued_capture: _QueuedCapture | None = None,
     ) -> dict:
         self._ensure_started()
-        self._wait_for_playback()
         from voicebridge.audio.capture import listen
         from voicebridge.audio.playback import audio_lock, play_chime_end
 
@@ -344,6 +443,13 @@ class VoiceRuntime:
         if effective_silence_ms <= 0:
             raise ValueError("silence_ms must be positive")
 
+        cancel_event = self._begin_capture()
+        try:
+            self._wait_for_playback()
+        except Exception:
+            self._end_capture(cancel_event)
+            raise
+
         started_at = (
             queued_capture.started_at if queued_capture is not None else time.monotonic()
         )
@@ -356,7 +462,6 @@ class VoiceRuntime:
         speech_detected = False
         end_reason = "timeout"
         error = None
-
         try:
             while True:
                 if pending_result is not None:
@@ -374,11 +479,16 @@ class VoiceRuntime:
                         output_device=self.config.audio.output_device,
                         start_chime=first_attempt,
                         end_chime=False,
+                        cancel_event=cancel_event,
                     )
                 first_attempt = False
                 end_reason = result.end_reason
                 error = result.error
 
+                if result.end_reason == "cancelled":
+                    speech_detected = False
+                    transcript = ""
+                    break
                 if result.end_reason == "device_error":
                     speech_detected = result.speech_detected
                     break
@@ -396,12 +506,14 @@ class VoiceRuntime:
                 if result.end_reason != "silence":
                     break
         finally:
-            try:
-                with audio_lock:
-                    play_chime_end(self.config.audio.output_device)
-            except Exception as exc:
-                end_reason = "device_error"
-                error = error or str(exc)
+            self._end_capture(cancel_event)
+            if not cancel_event.is_set():
+                try:
+                    with audio_lock:
+                        play_chime_end(self.config.audio.output_device)
+                except Exception as exc:
+                    end_reason = "device_error"
+                    error = error or str(exc)
 
         if discarded_empty_segments and not transcript and end_reason != "device_error":
             speech_detected = False
@@ -446,6 +558,9 @@ class VoiceRuntime:
         )
 
     def _release_locked(self) -> None:
+        with self._activity_lock:
+            self._playback = None
+            self._capture_cancel = None
         self._tts = None
         self._stt = None
         gc.collect()
