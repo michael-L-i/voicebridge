@@ -153,6 +153,7 @@ class PluginContractTests(unittest.TestCase):
             source.index("version_info < (3, 11)"), source.index("BUILD_DIR=$(mktemp")
         )
         logical_source = source.replace("\\\n", "")
+        self.assertNotIn("--upgrade pip", logical_source)
         for line in logical_source.splitlines():
             if line.strip().startswith("echo "):
                 self.assertIn(">", line, f"echo lacks a redirection: {line}")
