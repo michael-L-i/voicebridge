@@ -77,7 +77,24 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
   # venv path is switched only after every install step succeeds.
   BUILD_DIR=$(mktemp -d "${DATA_DIR}/.venv-build.XXXXXX")
   NEXT_LINK=""
+  OLD_TARGET=""
   cleanup_install() {
+    # A signal may arrive after either half of legacy activation completes.
+    if [ -n "${BUILD_DIR}" ] && [ -L "${VENV_DIR}" ] && \
+       [ "$(readlink "${VENV_DIR}")" = "${BUILD_DIR}" ]; then
+      NEXT_LINK=""
+      BUILD_DIR=""
+      case "${OLD_TARGET}" in
+        "${DATA_DIR}"/.venv-build.*|"${DATA_DIR}"/.venv-previous.*)
+          rm -rf -- "${OLD_TARGET}"
+          ;;
+      esac
+      OLD_TARGET=""
+    elif [ -n "${OLD_TARGET}" ] && [ ! -e "${VENV_DIR}" ] && \
+         [ -e "${OLD_TARGET}" ]; then
+      mv "${OLD_TARGET}" "${VENV_DIR}"
+      OLD_TARGET=""
+    fi
     if [ -n "${NEXT_LINK}" ] && [ -L "${NEXT_LINK}" ]; then
       rm -- "${NEXT_LINK}"
     fi
@@ -105,14 +122,13 @@ if [ "${NEEDS_INSTALL}" = "1" ]; then
   rmdir "${NEXT_LINK}"
   ln -s "${BUILD_DIR}" "${NEXT_LINK}"
 
-  OLD_TARGET=""
   if [ -L "${VENV_DIR}" ]; then
     OLD_TARGET=$(readlink "${VENV_DIR}")
     case "${OLD_TARGET}" in
       /*) ;;
       *) OLD_TARGET="${DATA_DIR}/${OLD_TARGET}" ;;
     esac
-    mv -f "${NEXT_LINK}" "${VENV_DIR}"
+    mv -fh "${NEXT_LINK}" "${VENV_DIR}"
   elif [ -e "${VENV_DIR}" ]; then
     # Migrate the legacy real directory only after the replacement is ready.
     OLD_TARGET=$(mktemp -d "${DATA_DIR}/.venv-previous.XXXXXX")
