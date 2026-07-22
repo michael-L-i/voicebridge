@@ -35,7 +35,8 @@ There is no passive narration. Users explicitly start Voice Code with
 The MCP process itself is lightweight until voice mode starts. Models remain
 warm between turns, then are released when the conversation stops.
 
-The package is Python 3.11+ and is configured by `pyproject.toml`.
+The package supports Python 3.11 through 3.14 and is configured by
+`pyproject.toml`.
 
 ## Plugin Layout
 

@@ -182,23 +182,26 @@ if ! environment_is_current; then
 
   PYTHON_BIN="${VOICEBRIDGE_PYTHON:-}"
   if [ -z "${PYTHON_BIN}" ]; then
-    PYTHON_BIN=$(command -v python3.13 || command -v python3.12 || \
+    PYTHON_BIN=$(command -v python3.14 || command -v python3.13 || \
+      command -v python3.12 || \
       command -v python3.11 || command -v python3 || true)
   fi
   if [ -z "${PYTHON_BIN}" ]; then
-    echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11+" \
-         "(e.g. brew install python@3.12) and start a new session." >&2
+    echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11" \
+         "through 3.14 (e.g. brew install python@3.14) and start a new session." >&2
     exit 1
   fi
   # A symlinked interpreter (common with uv-managed Python) can make venv
   # record the symlink directory as its runtime home and fail in ensurepip.
   PYTHON_BIN=$("${PYTHON_BIN}" -c \
     'import os, sys; print(os.path.realpath(sys.executable))')
-  if ! "${PYTHON_BIN}" -c 'import sys; raise SystemExit(sys.version_info < (3, 11))'; then
+  if ! "${PYTHON_BIN}" -c \
+    'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 15)))'; then
     PYTHON_VERSION=$("${PYTHON_BIN}" -c \
       'import sys; print(".".join(map(str, sys.version_info[:3])))')
-    echo "[voicebridge] ERROR: Python 3.11+ is required; found ${PYTHON_VERSION}." >&2
-    echo "  Install it with: brew install python@3.12" >&2
+    echo "[voicebridge] ERROR: Python 3.11 through 3.14 is required;" \
+         "found ${PYTHON_VERSION}." >&2
+    echo "  Install it with: brew install python@3.14" >&2
     exit 1
   fi
 
@@ -237,10 +240,23 @@ if ! environment_is_current; then
   "${PYTHON_BIN}" -m venv "${BUILD_DIR}"
   # venv seeds pip from this Python's bundled ensurepip. Use that installer
   # rather than upgrading it from the network; runtime deps are hash-locked.
-  # misaki 0.9.4 declares Python <3.13 even though the locked release is
-  # exercised on 3.11-3.14 in CI; uv installs it across that supported matrix.
+  # misaki 0.9.4 incorrectly declares Python <3.13. Extract only its hashed
+  # lock entry and bypass that metadata with dependencies disabled, then let
+  # the normal hashed install enforce Requires-Python for every other package.
+  MISAKI_REQUIREMENT="${BUILD_DIR}/misaki.lock"
+  awk '
+    /^misaki==/ { copying = 1 }
+    copying && !/^misaki==/ && /^[^[:space:]]/ { exit }
+    copying { print }
+  ' "${REQUIREMENTS}" > "${MISAKI_REQUIREMENT}"
+  if ! grep -q '^misaki==' "${MISAKI_REQUIREMENT}"; then
+    echo "[voicebridge] ERROR: locked Misaki requirement is missing." >&2
+    exit 1
+  fi
   if ! "${BUILD_DIR}/bin/pip" install --quiet --require-hashes \
-    --ignore-requires-python -r "${REQUIREMENTS}" >&2 || \
+    --ignore-requires-python --no-deps -r "${MISAKI_REQUIREMENT}" >&2 || \
+     ! "${BUILD_DIR}/bin/pip" install --quiet --require-hashes \
+    -r "${REQUIREMENTS}" >&2 || \
      ! "${BUILD_DIR}/bin/pip" install --quiet --no-deps \
     -e "${PLUGIN_ROOT}" >&2; then
     echo "[voicebridge] ERROR: locked dependency install failed." >&2

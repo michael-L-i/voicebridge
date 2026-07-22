@@ -170,7 +170,8 @@ class PluginContractTests(unittest.TestCase):
         self.assertNotIn('pip" install --quiet -e', source)
         self.assertLess(source.index("uname -s"), source.index("BUILD_DIR=$(mktemp"))
         self.assertLess(
-            source.index("version_info < (3, 11)"), source.index("BUILD_DIR=$(mktemp")
+            source.index("(3, 11) <= sys.version_info < (3, 15)"),
+            source.index("BUILD_DIR=$(mktemp"),
         )
         logical_source = source.replace("\\\n", "")
         self.assertNotIn("--upgrade pip", logical_source)

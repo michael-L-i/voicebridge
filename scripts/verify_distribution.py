@@ -24,6 +24,10 @@ def package_metadata() -> tuple[str, str, str]:
     return project["name"], project["version"], project["requires-python"]
 
 
+def python_specifiers(value: str) -> frozenset[str]:
+    return frozenset(specifier.strip() for specifier in value.split(","))
+
+
 def verify_wheel(wheel: Path, name: str, version: str, requires_python: str) -> None:
     with zipfile.ZipFile(wheel) as archive:
         bad_file = archive.testzip()
@@ -36,7 +40,9 @@ def verify_wheel(wheel: Path, name: str, version: str, requires_python: str) -> 
         metadata = email.message_from_bytes(archive.read(metadata_paths[0]))
         if metadata["Name"] != name or metadata["Version"] != version:
             fail("wheel metadata does not match pyproject.toml")
-        if metadata["Requires-Python"] != requires_python:
+        if python_specifiers(metadata["Requires-Python"]) != python_specifiers(
+            requires_python
+        ):
             fail("wheel Requires-Python does not match pyproject.toml")
         if not any(path.startswith("voicebridge/") and path.endswith(".py") for path in names):
             fail("wheel does not contain the voicebridge package")
