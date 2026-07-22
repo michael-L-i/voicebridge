@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 
-from voicebridge.mcp.runtime import VoiceRuntime
+from voicebridge.mcp.runtime import VoiceRuntime, VoiceSessionNotStarted
 
 mcp = FastMCP(
     "voicebridge",
@@ -15,7 +15,10 @@ runtime = VoiceRuntime()
 
 
 def _error(exc: Exception) -> dict:
-    return {"ok": False, "error": str(exc)}
+    result = {"ok": False, "error": str(exc)}
+    if isinstance(exc, VoiceSessionNotStarted):
+        result["error_code"] = exc.error_code
+    return result
 
 
 @mcp.tool()
@@ -68,7 +71,8 @@ def voice_speak(
     when this speech ends a turn: VoiceBridge will open the mic immediately
     after playback, and the subsequent voice_listen call collects that queued
     capture instead of starting late. Leave it false for progress updates that
-    are followed by work rather than a user reply."""
+    are followed by work rather than a user reply. Requires a successful
+    voice_start; this tool never starts a session or loads models implicitly."""
     try:
         return {
             "ok": True,
@@ -92,7 +96,8 @@ def voice_listen(
     no words are discarded while the original timeout remains. Check
     speech_detected and end_reason; a timeout may still contain valid speech.
     Playback and recording are serialized because there is no echo
-    cancellation."""
+    cancellation. Requires a successful voice_start; this tool never starts a
+    session or loads models implicitly."""
     try:
         return {"ok": True, **runtime.listen(timeout_ms, silence_ms)}
     except Exception as exc:

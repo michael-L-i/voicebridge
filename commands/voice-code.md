@@ -82,7 +82,10 @@ Use two distinct outputs for each completed request:
    speak a short goodbye with `listen_after` false, call `voice_stop`, and do
    not listen again.
 13. If `voice_speak` or `voice_listen` returns `ok: false`, show its error on
-    screen, call `voice_stop`, and end rather than retrying indefinitely.
+    screen, call `voice_stop`, and end rather than retrying indefinitely. In
+    particular, `error_code: "session_not_started"` means the required
+    `voice_start` did not complete; do not use an audio tool to activate or
+    recover the session.
 
 Keep speech brief, direct, and conversational. `voice_speak` says your text
 verbatim, meaning it speaks the condensed audio summary you deliberately give

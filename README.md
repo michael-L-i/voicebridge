@@ -201,12 +201,16 @@ The plugin MCP tools are `voice_models`, `voice_configure`, `voice_start`,
 `voice_models` reports the ordered local choices without downloading them, and
 `voice_configure` persists a pair before a voice session begins. `voice_speak`
 always plays the exact text the host supplies; it never rewrites or summarizes
-that text locally. After stopping the host's current turn with Escape,
-`voice_interrupt` immediately silences current audio and captures added spoken
-guidance without unloading the models. `voice_status` reports the host,
-first-run state, running
-package version, and effective endpointing settings, which is useful for
-confirming an update actually restarted the MCP process.
+that text locally. Both `voice_speak` and `voice_listen` require a successful
+explicit `voice_start`; they never run audio preflight, acquire the audio
+session, or download or load models implicitly. If called too early, they
+return `error_code: "session_not_started"` without changing first-run state.
+After stopping the host's current turn with Escape, `voice_interrupt`
+immediately silences current audio and captures added spoken guidance without
+unloading the models.
+`voice_status` reports the host, first-run state, running package version, and
+effective endpointing settings, which is useful for confirming an update
+actually restarted the MCP process.
 
 ## CI and releases
 

@@ -157,6 +157,71 @@ class VoiceRuntimeTests(unittest.TestCase):
                 finally:
                     runtime.stop()
 
+    def test_speak_requires_explicit_start_without_session_side_effects(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ) as preflight,
+                patch.object(playback_module, "play_async") as play_async,
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                for text in ("Do not start implicitly.", "   "):
+                    with self.subTest(text=text), self.assertRaisesRegex(
+                        runtime_module.VoiceSessionNotStarted,
+                        "voice session is not started; call voice_start first",
+                    ):
+                        runtime.speak(text)
+
+            self.assertFalse((root / "session.lock").exists())
+            self.assertFalse((root / "data" / "onboarding-v1.complete").exists())
+
+        self.assertFalse(runtime.ready)
+        preflight.assert_not_called()
+        registry.get_tts_provider.assert_not_called()
+        registry.get_stt_provider.assert_not_called()
+        play_async.assert_not_called()
+
+    def test_listen_requires_explicit_start_without_session_side_effects(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch(
+                    "voicebridge.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ) as preflight,
+                patch.object(capture_module, "listen") as listen,
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                with self.assertRaisesRegex(
+                    runtime_module.VoiceSessionNotStarted,
+                    "voice session is not started; call voice_start first",
+                ):
+                    runtime.listen()
+
+            self.assertFalse((root / "session.lock").exists())
+            self.assertFalse((root / "data" / "onboarding-v1.complete").exists())
+
+        self.assertFalse(runtime.ready)
+        preflight.assert_not_called()
+        registry.get_tts_provider.assert_not_called()
+        registry.get_stt_provider.assert_not_called()
+        listen.assert_not_called()
+
     def test_models_are_reused_and_onboarding_completes_after_loading(self):
         tts = _FakeTTS()
         stt = _FakeSTT()
@@ -262,6 +327,7 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(playback_module, "play_chime_end"),
             ):
                 runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
                 spoken = runtime.speak("Your result is ready.", listen_after=True)
 
                 self.assertTrue(playback_waiting.wait(timeout=1))
@@ -430,6 +496,7 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(playback_module, "play_chime_end"),
             ):
                 runtime = runtime_module.VoiceRuntime(config, data_dir=root / "data")
+                runtime.start()
                 configured = runtime.listen()
                 overridden = runtime.listen(timeout_ms=12000, silence_ms=750)
                 runtime.stop()
@@ -477,6 +544,7 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(playback_module, "play_chime_end") as play_chime_end,
             ):
                 runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
                 result = runtime.listen()
                 runtime.stop()
 
@@ -528,6 +596,7 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(playback_module, "play_chime_end"),
             ):
                 runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
                 result = runtime.listen()
                 runtime.stop()
 
