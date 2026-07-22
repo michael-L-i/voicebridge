@@ -104,7 +104,7 @@ class PluginContractTests(unittest.TestCase):
             codex["interface"]["defaultPrompt"],
         )
 
-    def test_server_exposes_only_the_seven_voice_tools(self):
+    def test_server_exposes_only_the_eight_voice_tools(self):
         source = (ROOT / "voicebridge/mcp/server.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         tools = {
@@ -126,11 +126,31 @@ class PluginContractTests(unittest.TestCase):
                 "voice_start",
                 "voice_speak",
                 "voice_listen",
+                "voice_interrupt",
                 "voice_stop",
                 "voice_status",
             },
         )
         self.assertIn("Only call audio tools after the user explicitly", source)
+
+    def test_interrupt_is_available_from_both_host_uis(self):
+        skill = (ROOT / "skills/voice-interrupt/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        command = (ROOT / "commands/voice-interrupt.md").read_text(
+            encoding="utf-8"
+        )
+        metadata = (ROOT / "skills/voice-interrupt/agents/openai.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("explicitly invokes $voice-interrupt", skill)
+        self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("mcp__voicebridge__voice_interrupt", skill)
+        self.assertIn("mcp__voicebridge__voice_interrupt", command)
+        self.assertIn("added guidance", skill)
+        self.assertIn("added guidance", command)
+        self.assertIn("Escape", command)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
         bootstrap = ROOT / "bin/voicebridge-mcp-bootstrap"

@@ -100,6 +100,23 @@ def voice_listen(
 
 
 @mcp.tool()
+def voice_interrupt(
+    timeout_ms: int | None = None,
+    silence_ms: int | None = None,
+) -> dict:
+    """Interrupt current VoiceBridge audio and capture added guidance.
+
+    Use after the user interrupts the host's current turn. Any active speech or
+    queued microphone capture is cancelled, the warmed models remain loaded,
+    and one fresh microphone capture is returned as guidance for continuing or
+    redirecting the interrupted task."""
+    try:
+        return {"ok": True, **runtime.interrupt(timeout_ms, silence_ms)}
+    except Exception as exc:
+        return _error(exc)
+
+
+@mcp.tool()
 def voice_stop() -> dict:
     """End voice mode and release its local TTS and STT model memory."""
     try:
@@ -115,7 +132,10 @@ def voice_status() -> dict:
 
 
 def main():
-    mcp.run(transport="stdio")
+    try:
+        mcp.run(transport="stdio")
+    finally:
+        runtime.stop()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import threading
+import time
 
 import numpy as np
 import sounddevice as sd
@@ -16,6 +17,9 @@ _CHIME_ATTACK_S = 0.005
 _CHIME_DECAY_RATE = 18.0
 _CHIME_OVERTONE_LEVEL = 0.35
 _CHIME_TRAILING_SILENCE_S = 0.05
+_STREAM_POLL_S = 0.05
+_DEVICE_STALL_S = 2.0
+_STREAM_START_TIMEOUT_S = 5.0
 
 
 class PlaybackHandle:
@@ -25,6 +29,8 @@ class PlaybackHandle:
         sample_rate: int,
         device: str | int | None,
     ) -> None:
+        self._cancelled = threading.Event()
+        self._finished = threading.Event()
         self._started = threading.Event()
         self._error: Exception | None = None
         self._thread = threading.Thread(
@@ -34,7 +40,9 @@ class PlaybackHandle:
             daemon=True,
         )
         self._thread.start()
-        self._started.wait()
+        if not self._started.wait(_STREAM_START_TIMEOUT_S):
+            self.cancel()
+            raise TimeoutError("audio output did not start")
         if self._error is not None:
             raise self._error
 
@@ -46,20 +54,73 @@ class PlaybackHandle:
     ) -> None:
         try:
             with audio_lock:
-                sd.play(
-                    audio,
-                    samplerate=sample_rate,
-                    blocking=False,
-                    device=_device_arg(device),
-                )
-                self._started.set()
-                sd.wait()
-        except Exception as exc:
-            self._error = exc
-            self._started.set()
+                if self._cancelled.is_set():
+                    self._started.set()
+                    return
 
-    def wait(self) -> None:
-        self._thread.join()
+                samples = np.asarray(audio, dtype=np.float32)
+                channels = 1 if samples.ndim == 1 else samples.shape[1]
+                position = 0
+                last_callback_at = time.monotonic()
+
+                def callback(outdata, frames, time_info, status):
+                    nonlocal position, last_callback_at
+                    last_callback_at = time.monotonic()
+                    if self._cancelled.is_set():
+                        outdata.fill(0)
+                        raise sd.CallbackAbort
+
+                    available = samples.shape[0] - position
+                    copied = min(frames, available)
+                    outdata.fill(0)
+                    if copied:
+                        source = samples[position : position + copied]
+                        if samples.ndim == 1:
+                            outdata[:copied, 0] = source
+                        else:
+                            outdata[:copied] = source
+                        position += copied
+                    if position >= samples.shape[0]:
+                        raise sd.CallbackStop
+
+                with sd.OutputStream(
+                    samplerate=sample_rate,
+                    channels=channels,
+                    dtype="float32",
+                    callback=callback,
+                    finished_callback=self._finished.set,
+                    device=_device_arg(device),
+                ) as stream:
+                    self._started.set()
+                    while not self._finished.wait(_STREAM_POLL_S):
+                        if self._cancelled.is_set():
+                            stream.abort(ignore_errors=True)
+                            break
+                        if time.monotonic() - last_callback_at >= _DEVICE_STALL_S:
+                            self._error = RuntimeError(
+                                "audio output stopped delivering data"
+                            )
+                            stream.abort(ignore_errors=True)
+                            break
+        except Exception as exc:
+            if not self._cancelled.is_set():
+                self._error = exc
+        finally:
+            self._started.set()
+            self._finished.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled.is_set()
+
+    def cancel(self) -> None:
+        """Stop playback promptly. Safe to call more than once."""
+        self._cancelled.set()
+
+    def wait(self, timeout: float | None = None) -> None:
+        self._thread.join(timeout)
+        if self._thread.is_alive():
+            raise TimeoutError("audio playback did not stop")
         if self._error is not None:
             raise self._error
 
