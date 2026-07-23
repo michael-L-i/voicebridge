@@ -83,6 +83,43 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn('error_code: "session_not_started"', skill)
         self.assertIn('error_code: "session_not_started"', command)
 
+    def test_first_run_onboarding_covers_text_voice_and_host_controls(self):
+        codex = (ROOT / "skills/voice-code/SKILL.md").read_text(encoding="utf-8")
+        claude = (ROOT / "commands/voice-code.md").read_text(encoding="utf-8")
+
+        for workflow in (codex, claude):
+            normalized = " ".join(workflow.split())
+            self.assertIn("reproduce this fixed onboarding script verbatim", normalized)
+            self.assertIn("WELCOME TO VOICEBRIDGE", normalized)
+            self.assertIn("YOU SPEAK -> I WORK", normalized)
+            self.assertIn("We alternate turns", normalized)
+            self.assertIn("the microphone opens again", normalized)
+            self.assertIn("PRESET MODELS", normalized)
+            self.assertIn("Pocket TTS 100M", normalized)
+            self.assertIn("Parakeet 110M", normalized)
+            self.assertIn("PRIVACY", normalized)
+            self.assertIn("run locally on this Mac", normalized)
+            self.assertIn("skip the fixed script", normalized)
+            self.assertIn("load automatically on your first start", normalized)
+            self.assertIn("defaults.tts", normalized)
+            self.assertIn("defaults.stt", normalized)
+            self.assertIn("Do not present a model selector", normalized)
+            self.assertIn("or wait for confirmation", normalized)
+            self.assertIn(
+                "Welcome to VoiceBridge. We can talk through whatever", normalized
+            )
+            self.assertIn("press Escape", normalized)
+            self.assertIn("choose Voice Interrupt", normalized)
+
+        for command in ("$voice-code", "$voice-settings", "$voice-interrupt"):
+            self.assertIn(command, codex)
+        for command in (
+            "/voicebridge:voice-code",
+            "/voicebridge:voice-settings",
+            "/voicebridge:voice-interrupt",
+        ):
+            self.assertIn(command, claude)
+
     def test_settings_are_available_from_both_host_uis(self):
         skill = (ROOT / "skills/voice-settings/SKILL.md").read_text(
             encoding="utf-8"

@@ -15,8 +15,9 @@ reasoning or summarization model.
 There is no passive narration. Users explicitly start Voice Code with
 `$voice-code` or `/skills` in Codex, or `/voicebridge:voice-code` in Claude Code:
 
-- On a new install, the host calls `voice_models`, presents the ordered local
-  choices, and persists the selected pair through `voice_configure`.
+- On a new install, the host calls `voice_models`, shows the fixed first-run
+  orientation, and persists its returned Pocket TTS and Parakeet 110M defaults
+  through `voice_configure` without pausing for model selection.
 - The host calls `voice_start`, which preflights audio access, loads the selected
   TTS and STT models in the MCP process, then speaks a greeting via
   `voice_speak`.
