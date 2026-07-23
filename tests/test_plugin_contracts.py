@@ -20,7 +20,7 @@ class PluginContractTests(unittest.TestCase):
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
 
-        self.assertEqual(project_version, "0.4.0")
+        self.assertEqual(project_version, "0.4.1")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
         self.assertEqual(
@@ -77,6 +77,8 @@ class PluginContractTests(unittest.TestCase):
         for tool in expected_tools:
             self.assertIn(f"mcp__voicebridge__{tool}", skill)
             self.assertIn(f"mcp__voicebridge__{tool}", command)
+        self.assertIn("voicebridge-mcp-bootstrap --setup", command)
+        self.assertIn("/reload-plugins", command)
         self.assertIn("If `first_run` is true", command)
         self.assertIn('error_code: "session_not_started"', skill)
         self.assertIn('error_code: "session_not_started"', command)

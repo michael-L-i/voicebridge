@@ -45,6 +45,10 @@ preselected), grant microphone access, and the chosen pair downloads
 automatically. Change your choice anytime with `/voicebridge:voice-settings`
 (Claude Code) or `$voice-settings` (Codex).
 
+If Claude Code's voice tools are still connecting on first use, Voice Code
+finishes the one-time dependency setup and asks you to run `/reload-plugins`
+before invoking it again.
+
 To update, re-run the marketplace/plugin update commands for your host, then
 fully restart it — an already-running MCP process isn't replaced in place.
 
