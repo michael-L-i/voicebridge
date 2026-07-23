@@ -100,6 +100,11 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("PRIVACY", normalized)
             self.assertIn("run locally on this Mac", normalized)
             self.assertIn("skip the fixed script", normalized)
+            self.assertIn("load automatically on your first start", normalized)
+            self.assertIn("defaults.tts", normalized)
+            self.assertIn("defaults.stt", normalized)
+            self.assertIn("Do not present a model selector", normalized)
+            self.assertIn("or wait for confirmation", normalized)
             self.assertIn(
                 "Welcome to VoiceBridge. We can talk through whatever", normalized
             )

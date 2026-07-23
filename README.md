@@ -40,9 +40,9 @@ codex plugin add voicebridge@voicebridge-marketplace
 Start a new Codex session, then run `$voice-code` (or pick Voice Code from
 `/skills`).
 
-On first run you'll pick a TTS and STT model (Pocket + Parakeet 110M are
-preselected), grant microphone access, and the chosen pair downloads
-automatically. Change your choice anytime with `/voicebridge:voice-settings`
+On first run VoiceBridge shows a quick orientation, starts with Pocket TTS and
+Parakeet 110M, requests microphone access, and downloads both models
+automatically. Change either model anytime with `/voicebridge:voice-settings`
 (Claude Code) or `$voice-settings` (Codex).
 
 If Claude Code's voice tools are still connecting on first use, Voice Code

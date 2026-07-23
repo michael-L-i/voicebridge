@@ -35,15 +35,15 @@ Maintain two outputs for completed work:
    |
    +-- CONTROLS -------------------------------------------------------+
    | $voice-code       Start a voice conversation.
-   | $voice-settings   Change the local voice or listening model.
+   | $voice-settings   Change the local voice or listening model anytime.
    | $voice-interrupt  After pressing Escape, add new guidance.
    | Say "stop" or "goodbye" to finish the conversation.
    |
    +-- PRESET MODELS --------------------------------------------------+
    | Voice (TTS)       Pocket TTS 100M
    | Listening (STT)   Parakeet 110M
-   | These recommended models are already selected. Keep them or
-   | choose a different pair next.
+   | These recommended models load automatically on your first start.
+   | Run $voice-settings anytime to choose another pair.
    |
    +-- PRIVACY --------------------------------------------------------+
    | Speech recognition and synthesis run locally on this Mac.
@@ -51,15 +51,12 @@ Maintain two outputs for completed work:
    +------------------------------------------------------------------+
    ```
 
-   Then present separate TTS and STT single-choice selectors using Codex's
-   structured question UI when available, with a numbered conversational
-   fallback. The structured UI starts on the first listed option, so list the
-   returned default first in each selector with "(Recommended)" appended to its
-   label, then the remaining options lightest to heaviest. Show each option's
-   tier, download size, and short description. If the user cancels, end without
-   calling `voice_start`. Otherwise call `voice_configure` with both selected
-   IDs. Existing users with `first_run: false` skip the fixed script and
-   onboarding choice silently.
+   Immediately call `voice_configure` with `defaults.tts` and `defaults.stt`
+   from `voice_models` (Pocket TTS and Parakeet 110M). Do not present a model
+   selector, ask a model-selection question, or wait for confirmation. If
+   configuration fails, show the error and end without calling `voice_start`.
+   Existing users with `first_run: false` skip the fixed script and automatic
+   default configuration silently.
 2. Call `voice_start` and wait for the audio preflight and local speech models.
    Do not call any VoiceBridge audio tool before this explicit skill invocation.
    If it returns `ok: false`, show the error and end without retrying.
