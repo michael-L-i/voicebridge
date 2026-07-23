@@ -73,7 +73,7 @@ help avoid conflicts and minimize harm.
 
 When an incident does occur, it is important to report it promptly. To report a
 possible violation, email **michaelli2005li@gmail.com** with the subject
-"VoiceBridge Code of Conduct report." Do not report conduct incidents in a
+"Cadence Code Code of Conduct report." Do not report conduct incidents in a
 public issue. If the maintainer is involved in the incident, say so in the
 message; an independent moderator will be asked to review the report.
 

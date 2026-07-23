@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem with VoiceBridge
+description: Report a reproducible problem with Cadence Code
 title: "[Bug]: "
 labels:
   - bug
@@ -21,7 +21,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: VoiceBridge version
+      label: Cadence Code version
       description: Use the version reported by `voice_status` when possible.
       placeholder: Output of voice_status
     validations:
@@ -30,7 +30,7 @@ body:
     id: host
     attributes:
       label: Host
-      description: Which coding agent was running VoiceBridge?
+      description: Which coding agent was running Cadence Code?
       options:
         - Codex
         - Claude Code
@@ -67,7 +67,7 @@ body:
     id: models
     attributes:
       label: Selected speech models
-      description: Use the configured model names reported by VoiceBridge when possible.
+      description: Use the configured model names reported by Cadence Code when possible.
       placeholder: |
         TTS model:
         STT model:

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from voicebridge.audio import playback
+from cadence_code.audio import playback
 
 
 class ChimeTests(unittest.TestCase):

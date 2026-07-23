@@ -1,11 +1,11 @@
 {
-  "name": "voicebridge-marketplace",
+  "name": "cadence-code-marketplace",
   "interface": {
-    "displayName": "VoiceBridge"
+    "displayName": "Cadence Code"
   },
   "plugins": [
     {
-      "name": "voicebridge",
+      "name": "cadence-code",
       "source": {
         "source": "local",
         "path": "./"

@@ -1,19 +1,19 @@
 import numpy as np
 from mlx_audio.tts.utils import load_model
 
-from voicebridge.config import TTSConfig
-from voicebridge.providers.base import TTSProvider
-from voicebridge.providers.output import model_output_to_stderr
+from cadence_code.config import TTSConfig
+from cadence_code.providers.base import TTSProvider
+from cadence_code.providers.output import model_output_to_stderr
 
 
-class PocketTTSProvider(TTSProvider):
+class QwenTTSProvider(TTSProvider):
     sample_rate = 24000
 
     def __init__(self, config: TTSConfig):
         self.config = config
         self._model = None
 
-    def load(self) -> "PocketTTSProvider":
+    def load(self) -> "QwenTTSProvider":
         if self._model is None:
             with model_output_to_stderr():
                 self._model = load_model(self.config.model)
@@ -26,7 +26,9 @@ class PocketTTSProvider(TTSProvider):
                 np.array(result.audio, copy=False)
                 for result in self._model.generate(
                     text=text,
-                    voice=voice or self.config.voice,
+                    voice=voice or self.config.voice or "Aiden",
+                    lang_code="english",
+                    speed=self.config.speed,
                 )
             ]
         if not chunks:

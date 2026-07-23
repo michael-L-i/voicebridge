@@ -1,10 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 
-from voicebridge.providers.registry import STT_PROVIDERS, TTS_PROVIDERS
+from cadence_code.providers.registry import STT_PROVIDERS, TTS_PROVIDERS
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +36,7 @@ class MCPStdioTests(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(FIXTURE)],
             cwd=ROOT,
+            env={**os.environ, "PYTHONPATH": str(ROOT)},
             input="".join(json.dumps(message) + "\n" for message in messages),
             capture_output=True,
             text=True,

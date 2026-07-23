@@ -2,9 +2,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from voicebridge.config import STTConfig, TTSConfig
-from voicebridge.mcp import server
-from voicebridge.providers import registry
+from cadence_code.config import STTConfig, TTSConfig
+from cadence_code.mcp import server
+from cadence_code.providers import registry
 
 
 class _NoisyTTSModel:

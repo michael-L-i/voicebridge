@@ -44,8 +44,8 @@ def verify_wheel(wheel: Path, name: str, version: str, requires_python: str) -> 
             requires_python
         ):
             fail("wheel Requires-Python does not match pyproject.toml")
-        if not any(path.startswith("voicebridge/") and path.endswith(".py") for path in names):
-            fail("wheel does not contain the voicebridge package")
+        if not any(path.startswith("cadence_code/") and path.endswith(".py") for path in names):
+            fail("wheel does not contain the cadence_code package")
 
 
 def verify_sdist(sdist: Path, name: str, version: str) -> None:
@@ -54,8 +54,8 @@ def verify_sdist(sdist: Path, name: str, version: str) -> None:
         "pyproject.toml",
         "README.md",
         "LICENSE",
-        "voicebridge/config.py",
-        "voicebridge/mcp/server.py",
+        "cadence_code/config.py",
+        "cadence_code/mcp/server.py",
     }
     with tarfile.open(sdist, "r:gz") as archive:
         members = {member.name for member in archive.getmembers() if member.isfile()}

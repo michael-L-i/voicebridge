@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from voicebridge import __version__
-from voicebridge.config import (
+from cadence_code import __version__
+from cadence_code.config import (
     CONFIG_DIR,
     Config,
     STTConfig,
@@ -17,7 +17,7 @@ from voicebridge.config import (
     save_model_selection,
 )
 
-SESSION_LOCK_PATH = Path.home() / ".voicebridge" / "active-session.lock"
+SESSION_LOCK_PATH = Path.home() / ".cadence-code" / "active-session.lock"
 _ONBOARDING_MARKER = "onboarding-v1.complete"
 _CANCEL_WAIT_S = 3.0
 
@@ -49,7 +49,7 @@ class _QueuedListen:
         self._error: Exception | None = None
         self._thread = threading.Thread(
             target=self._run,
-            name="voicebridge-queued-listen",
+            name="cadence-code-queued-listen",
             daemon=True,
         )
 
@@ -82,7 +82,7 @@ class VoiceRuntime:
     def __init__(self, config: Config | None = None, *, data_dir: Path | None = None):
         self.config = config or load_config()
         self.data_dir = Path(data_dir) if data_dir is not None else CONFIG_DIR
-        self.host = os.environ.get("VOICEBRIDGE_HOST", "direct")
+        self.host = os.environ.get("CADENCE_CODE_HOST", "direct")
         self._operation_lock = threading.RLock()
         self._session_lock_file = None
         self._last_preflight: dict | None = None
@@ -111,7 +111,7 @@ class VoiceRuntime:
             started_at = time.monotonic()
             first_run = self._is_first_run()
             try:
-                from voicebridge.audio.preflight import run_preflight
+                from cadence_code.audio.preflight import run_preflight
 
                 self._last_preflight = run_preflight(
                     input_device=self.config.audio.input_device,
@@ -121,7 +121,7 @@ class VoiceRuntime:
 
                 # Keep heavy MLX imports out of MCP process startup. They are
                 # first needed only when the user explicitly starts voice mode.
-                from voicebridge.providers.registry import (
+                from cadence_code.providers.registry import (
                     get_stt_provider,
                     get_tts_provider,
                 )
@@ -159,7 +159,7 @@ class VoiceRuntime:
                         "voice_listen must collect the queued microphone capture "
                         "before voice_speak is called again"
                     )
-            from voicebridge.audio.playback import play_async
+            from cadence_code.audio.playback import play_async
 
             self._wait_for_playback()
             started_at = time.monotonic()
@@ -296,7 +296,7 @@ class VoiceRuntime:
         }
 
     def models(self) -> dict:
-        from voicebridge.models import model_catalog
+        from cadence_code.models import model_catalog
 
         return model_catalog(
             tts_provider=self.config.tts.provider,
@@ -313,7 +313,7 @@ class VoiceRuntime:
                     "call voice_stop first"
                 )
 
-            from voicebridge.models import get_model_option
+            from cadence_code.models import get_model_option
 
             tts_option = get_model_option("tts", tts)
             stt_option = get_model_option("stt", stt)
@@ -395,7 +395,7 @@ class VoiceRuntime:
             cancel_event = self._begin_capture(queued_cancel)
             try:
                 self._wait_for_playback()
-                from voicebridge.audio.capture import listen
+                from cadence_code.audio.capture import listen
 
                 timeout_ms = self.config.stt.max_listen_ms
                 silence_ms = self.config.stt.silence_ms
@@ -427,8 +427,8 @@ class VoiceRuntime:
         queued_capture: _QueuedCapture | None = None,
     ) -> dict:
         self._require_started()
-        from voicebridge.audio.capture import listen
-        from voicebridge.audio.playback import audio_lock, play_chime_end
+        from cadence_code.audio.capture import listen
+        from cadence_code.audio.playback import audio_lock, play_chime_end
 
         effective_timeout_ms = (
             queued_capture.timeout_ms
@@ -549,7 +549,7 @@ class VoiceRuntime:
         except BlockingIOError as exc:
             lock_file.close()
             raise VoiceSessionBusy(
-                "another VoiceBridge session is already using this Mac's audio devices"
+                "another Cadence Code session is already using this Mac's audio devices"
             ) from exc
         self._session_lock_file = lock_file
 
@@ -559,7 +559,7 @@ class VoiceRuntime:
     def _mark_onboarding_complete(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / _ONBOARDING_MARKER).write_text(
-            f"voicebridge {__version__}\n",
+            f"cadence-code {__version__}\n",
             encoding="utf-8",
         )
 

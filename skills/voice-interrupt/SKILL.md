@@ -1,15 +1,15 @@
 ---
 name: voice-interrupt
-description: Interrupt an active VoiceBridge conversation and add fresh spoken guidance to the current Codex task. Use only when the user explicitly invokes $voice-interrupt after stopping the current Codex turn.
+description: Interrupt an active Cadence Code conversation and add fresh spoken guidance to the current Codex task. Use only when the user explicitly invokes $voice-interrupt after stopping the current Codex turn.
 ---
 
 # Interrupt Voice Code
 
-Use `mcp__voicebridge__voice_interrupt` to stop current VoiceBridge audio and
-capture one fresh spoken instruction. VoiceBridge keeps its local speech models
+Use `mcp__cadence-code__voice_interrupt` to stop current Cadence Code audio and
+capture one fresh spoken instruction. Cadence Code keeps its local speech models
 loaded; this does not end the Voice Code session.
 
-1. Call `mcp__voicebridge__voice_interrupt` immediately. Do not call
+1. Call `mcp__cadence-code__voice_interrupt` immediately. Do not call
    `voice_start`, `voice_speak`, or ordinary `voice_listen` first.
 2. If it returns `ok: false`, show the error. When there is no active session,
    tell the user to invoke `$voice-code`; do not start Voice Code implicitly.
@@ -22,7 +22,7 @@ loaded; this does not end the Voice Code session.
 5. On `end_reason: "device_error"`, show the microphone problem and leave the
    Voice Code session active so the user can retry or call `voice_stop`.
 6. If the transcript clearly asks to end Voice Code entirely, call
-   `mcp__voicebridge__voice_stop` and do not resume the task.
+   `mcp__cadence-code__voice_stop` and do not resume the task.
 
 After accepting added guidance, continue the normal `$voice-code` behavior:
 work silently, then provide the concise spoken result and detailed written

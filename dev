@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEV_DATA_ROOT="${VOICEBRIDGE_DEV_DATA_ROOT:-${REPO_ROOT}/.voicebridge-dev}"
+DEV_DATA_ROOT="${CADENCE_CODE_DEV_DATA_ROOT:-${REPO_ROOT}/.cadence-code-dev}"
 
 usage() {
   cat <<'EOF'
@@ -43,7 +43,7 @@ Usage: ./dev claude [--fresh] [claude-options]
 
 Launch Claude Code from the repository root with this checkout loaded through
 --plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
-/voicebridge:voice-code to start the local voice flow. Use --fresh to clear the
+/cadence-code:voice-code to start the local voice flow. Use --fresh to clear the
 development configuration and onboarding marker while keeping the private venv.
 EOF
 }
@@ -64,10 +64,10 @@ reset_help() {
   cat <<'EOF'
 Usage: ./dev reset
 
-Move the checkout's complete .voicebridge-dev directory to macOS Trash. This
+Move the checkout's complete .cadence-code-dev directory to macOS Trash. This
 removes development venvs, configuration, and onboarding state for Inspector,
 Claude Code, and Codex. Production plugin data and shared model caches are not
-touched. Close every VoiceBridge host session before running this command.
+touched. Close every Cadence Code host session before running this command.
 EOF
 }
 
@@ -85,7 +85,7 @@ development_dir() {
       printf '%s\n' "${directory_real}"
       ;;
     *)
-      echo "[voicebridge-dev] ERROR: refusing data path outside ${root_real}" >&2
+      echo "[cadence-code-dev] ERROR: refusing data path outside ${root_real}" >&2
       exit 1
       ;;
   esac
@@ -106,31 +106,31 @@ run_reset() {
     exit 2
   fi
   if [ ! -e "${DEV_DATA_ROOT}" ]; then
-    echo "[voicebridge-dev] no development data to reset"
+    echo "[cadence-code-dev] no development data to reset"
     return
   fi
 
   local data_root_real
   data_root_real=$(cd "${DEV_DATA_ROOT}" && pwd -P)
-  if [ "$(basename "${data_root_real}")" != ".voicebridge-dev" ]; then
-    echo "[voicebridge-dev] ERROR: refusing to reset unsafe path: ${data_root_real}" >&2
+  if [ "$(basename "${data_root_real}")" != ".cadence-code-dev" ]; then
+    echo "[cadence-code-dev] ERROR: refusing to reset unsafe path: ${data_root_real}" >&2
     exit 1
   fi
 
-  local pgrep_bin="${VOICEBRIDGE_DEV_PGREP_BIN:-pgrep}"
+  local pgrep_bin="${CADENCE_CODE_DEV_PGREP_BIN:-pgrep}"
   if command -v "${pgrep_bin}" >/dev/null 2>&1 && \
-     "${pgrep_bin}" -f '[v]oicebridge-mcp' >/dev/null 2>&1; then
-    echo "[voicebridge-dev] ERROR: stop every VoiceBridge host session before reset." >&2
+     "${pgrep_bin}" -f '[c]adence-code-mcp' >/dev/null 2>&1; then
+    echo "[cadence-code-dev] ERROR: stop every Cadence Code host session before reset." >&2
     exit 1
   fi
 
-  local trash_bin="${VOICEBRIDGE_DEV_TRASH_BIN:-/usr/bin/trash}"
+  local trash_bin="${CADENCE_CODE_DEV_TRASH_BIN:-/usr/bin/trash}"
   if [ ! -x "${trash_bin}" ]; then
-    echo "[voicebridge-dev] ERROR: macOS trash command is unavailable." >&2
+    echo "[cadence-code-dev] ERROR: macOS trash command is unavailable." >&2
     exit 1
   fi
   "${trash_bin}" "${data_root_real}"
-  echo "[voicebridge-dev] moved ${data_root_real} to Trash"
+  echo "[cadence-code-dev] moved ${data_root_real} to Trash"
 }
 
 python_bin() {
@@ -142,7 +142,7 @@ python_bin() {
     command -v python3
     return
   fi
-  echo "[voicebridge-dev] ERROR: Python 3 is required." >&2
+  echo "[cadence-code-dev] ERROR: Python 3 is required." >&2
   exit 1
 }
 
@@ -159,17 +159,17 @@ run_check() {
   local python
   python=$(python_bin)
 
-  echo "[voicebridge-dev] checking Bash scripts"
-  bash -n "${REPO_ROOT}/dev" "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+  echo "[cadence-code-dev] checking Bash scripts"
+  bash -n "${REPO_ROOT}/dev" "${REPO_ROOT}/bin/cadence-code-mcp-bootstrap"
 
-  echo "[voicebridge-dev] running unit tests"
+  echo "[cadence-code-dev] running unit tests"
   "${python}" -m unittest discover -s "${REPO_ROOT}/tests" -v
 
   if command -v claude >/dev/null 2>&1; then
-    echo "[voicebridge-dev] validating Claude plugin"
+    echo "[cadence-code-dev] validating Claude plugin"
     claude plugin validate --strict "${REPO_ROOT}"
   else
-    echo "[voicebridge-dev] Claude Code is not installed; skipping plugin validation" >&2
+    echo "[cadence-code-dev] Claude Code is not installed; skipping plugin validation" >&2
   fi
 }
 
@@ -183,9 +183,9 @@ run_inspector() {
     exit 2
   fi
 
-  local npx_bin="${VOICEBRIDGE_DEV_NPX_BIN:-npx}"
+  local npx_bin="${CADENCE_CODE_DEV_NPX_BIN:-npx}"
   if ! command -v "${npx_bin}" >/dev/null 2>&1; then
-    echo "[voicebridge-dev] ERROR: npx is required for MCP Inspector." >&2
+    echo "[cadence-code-dev] ERROR: npx is required for MCP Inspector." >&2
     exit 1
   fi
 
@@ -193,9 +193,9 @@ run_inspector() {
   data_dir=$(development_dir inspector)
   exec "${npx_bin}" -y @modelcontextprotocol/inspector \
     env \
-    "VOICEBRIDGE_DATA_DIR=${data_dir}" \
-    "VOICEBRIDGE_HOST=inspector" \
-    "${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
+    "CADENCE_CODE_DATA_DIR=${data_dir}" \
+    "CADENCE_CODE_HOST=inspector" \
+    "${REPO_ROOT}/bin/cadence-code-mcp-bootstrap"
 }
 
 run_claude() {
@@ -218,9 +218,9 @@ run_claude() {
     shift
   done
 
-  local claude_bin="${VOICEBRIDGE_DEV_CLAUDE_BIN:-claude}"
+  local claude_bin="${CADENCE_CODE_DEV_CLAUDE_BIN:-claude}"
   if ! command -v "${claude_bin}" >/dev/null 2>&1; then
-    echo "[voicebridge-dev] ERROR: Claude Code is not installed." >&2
+    echo "[cadence-code-dev] ERROR: Claude Code is not installed." >&2
     exit 1
   fi
 
@@ -228,10 +228,10 @@ run_claude() {
   data_dir=$(development_dir claude)
   if [ "${fresh}" = "1" ]; then
     reset_onboarding "${data_dir}"
-    echo "[voicebridge-dev] reset Claude development onboarding"
+    echo "[cadence-code-dev] reset Claude development onboarding"
   fi
   cd "${REPO_ROOT}"
-  export VOICEBRIDGE_DEV_DATA_DIR="${data_dir}"
+  export CADENCE_CODE_DEV_DATA_DIR="${data_dir}"
   if [ "${#claude_args[@]}" -eq 0 ]; then
     exec "${claude_bin}" --plugin-dir "${REPO_ROOT}"
   fi
@@ -258,9 +258,9 @@ run_codex() {
     shift
   done
 
-  local codex_bin="${VOICEBRIDGE_DEV_CODEX_BIN:-codex}"
+  local codex_bin="${CADENCE_CODE_DEV_CODEX_BIN:-codex}"
   if ! command -v "${codex_bin}" >/dev/null 2>&1; then
-    echo "[voicebridge-dev] ERROR: Codex is not installed." >&2
+    echo "[cadence-code-dev] ERROR: Codex is not installed." >&2
     exit 1
   fi
 
@@ -268,25 +268,25 @@ run_codex() {
   data_dir=$(development_dir codex)
   if [ "${fresh}" = "1" ]; then
     reset_onboarding "${data_dir}"
-    echo "[voicebridge-dev] reset Codex development onboarding"
+    echo "[cadence-code-dev] reset Codex development onboarding"
   fi
-  unset VOICEBRIDGE_DEV_DATA_DIR
+  unset CADENCE_CODE_DEV_DATA_DIR
   cd "${REPO_ROOT}"
-  local -a voicebridge_config=(
+  local -a cadence_code_config=(
     -C "${REPO_ROOT}"
-    -c "mcp_servers.voicebridge.command=${REPO_ROOT}/bin/voicebridge-mcp-bootstrap"
-    -c "mcp_servers.voicebridge.cwd=${REPO_ROOT}"
-    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR=${data_dir}"
-    -c "mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex"
-    -c "mcp_servers.voicebridge.startup_timeout_sec=900"
-    -c "mcp_servers.voicebridge.tool_timeout_sec=1800"
-    -c "mcp_servers.voicebridge.default_tools_approval_mode=approve"
-    -c "mcp_servers.voicebridge.required=true"
+    -c "mcp_servers.cadence-code.command=${REPO_ROOT}/bin/cadence-code-mcp-bootstrap"
+    -c "mcp_servers.cadence-code.cwd=${REPO_ROOT}"
+    -c "mcp_servers.cadence-code.env.CADENCE_CODE_DATA_DIR=${data_dir}"
+    -c "mcp_servers.cadence-code.env.CADENCE_CODE_HOST=codex"
+    -c "mcp_servers.cadence-code.startup_timeout_sec=900"
+    -c "mcp_servers.cadence-code.tool_timeout_sec=1800"
+    -c "mcp_servers.cadence-code.default_tools_approval_mode=approve"
+    -c "mcp_servers.cadence-code.required=true"
   )
   if [ "${#codex_args[@]}" -eq 0 ]; then
-    exec "${codex_bin}" "${voicebridge_config[@]}"
+    exec "${codex_bin}" "${cadence_code_config[@]}"
   fi
-  exec "${codex_bin}" "${voicebridge_config[@]}" "${codex_args[@]}"
+  exec "${codex_bin}" "${cadence_code_config[@]}" "${codex_args[@]}"
 }
 
 case "${1:-}" in
@@ -314,7 +314,7 @@ case "${1:-}" in
     usage
     ;;
   *)
-    echo "[voicebridge-dev] ERROR: unknown command: $1" >&2
+    echo "[cadence-code-dev] ERROR: unknown command: $1" >&2
     usage >&2
     exit 2
     ;;

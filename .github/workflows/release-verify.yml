@@ -62,18 +62,18 @@ jobs:
 
       - name: Bootstrap an empty release environment
         env:
-          VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}/voicebridge-bootstrap
-          VOICEBRIDGE_PYTHON: python
-        run: ./bin/voicebridge-mcp-bootstrap </dev/null
+          CADENCE_CODE_DATA_DIR: ${{ runner.temp }}/cadence-code-bootstrap
+          CADENCE_CODE_PYTHON: python
+        run: ./bin/cadence-code-mcp-bootstrap </dev/null
 
       - name: Verify the bootstrapped Kokoro English frontend
         run: |
-          $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -m unittest \
+          $RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python -m unittest \
             discover -s tests -p test_kokoro_frontend.py -v
 
       - name: Validate source and plugins
         run: |
-          runtime_python="$RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python"
+          runtime_python="$RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python"
           "$runtime_python" -c 'import mlx.core as mx; print(mx.default_device())'
           "$runtime_python" scripts/validate_plugin.py
           "$runtime_python" -m unittest discover -s tests -v
@@ -82,5 +82,5 @@ jobs:
         run: |
           artifact_dir="$(mktemp -d)"
           uv build --out-dir "$artifact_dir"
-          "$RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python" \
+          "$RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python" \
             scripts/verify_distribution.py "$artifact_dir"

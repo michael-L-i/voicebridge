@@ -9,7 +9,7 @@ import numpy as np
 import sounddevice as sd
 import webrtcvad
 
-from voicebridge.audio.playback import audio_lock, play_chime_end, play_chime_start
+from cadence_code.audio.playback import audio_lock, play_chime_end, play_chime_start
 
 # WebRTC VAD only accepts exactly 10, 20, or 30 ms frames.
 # Speech onset is gated by a stricter classifier so room noise cannot start a

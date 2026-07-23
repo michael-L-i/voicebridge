@@ -1,12 +1,12 @@
 {
-  "name": "voicebridge-marketplace",
+  "name": "cadence-code-marketplace",
   "owner": {
     "name": "Michael Li"
   },
-  "description": "Marketplace for VoiceBridge, local speech input and output for Claude Code on Apple Silicon.",
+  "description": "Marketplace for Cadence Code, local speech input and output for Claude Code on Apple Silicon.",
   "plugins": [
     {
-      "name": "voicebridge",
+      "name": "cadence-code",
       "source": "./",
       "description": "Configurable local speech and transcription for natural Claude Code conversations on Apple Silicon."
     }

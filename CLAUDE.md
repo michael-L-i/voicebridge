@@ -2,16 +2,16 @@
 
 ## Project Summary
 
-`voicebridge` gives Claude Code a fully local voice interface on Apple Silicon.
+`cadence-code` gives Claude Code a fully local voice interface on Apple Silicon.
 The plugin's stdio MCP process owns the selected TTS and STT models directly for
 an active conversation; there is no HTTP daemon or local summarization model.
 Speech models run through MLX Audio. MLX is not used to generate or rewrite
 Claude's response.
 
-The main integration surface is `/voicebridge:voice-code`. It loops between
+The main integration surface is `/cadence-code:voice-code`. It loops between
 choosing models on a new install, then speaking and listening through
 `voice_start`, `voice_speak`, `voice_listen`, and `voice_stop`. After pressing
-Escape, `/voicebridge:voice-interrupt` silences current audio and captures added
+Escape, `/cadence-code:voice-interrupt` silences current audio and captures added
 guidance through `voice_interrupt`. Claude Code supplies the exact text spoken
 by TTS. There is no passive narration.
 

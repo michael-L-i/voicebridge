@@ -1,12 +1,12 @@
-from voicebridge.config import STTConfig, TTSConfig
-from voicebridge.providers.base import STTProvider, TTSProvider
-from voicebridge.providers.chatterbox_tts import ChatterboxTTSProvider
-from voicebridge.providers.kokoro_tts import KokoroTTSProvider
-from voicebridge.providers.moonshine_stt import MoonshineSTTProvider
-from voicebridge.providers.parakeet_stt import ParakeetSTTProvider
-from voicebridge.providers.pocket_tts import PocketTTSProvider
-from voicebridge.providers.qwen_tts import QwenTTSProvider
-from voicebridge.providers.whisper_stt import WhisperSTTProvider
+from cadence_code.config import STTConfig, TTSConfig
+from cadence_code.providers.base import STTProvider, TTSProvider
+from cadence_code.providers.chatterbox_tts import ChatterboxTTSProvider
+from cadence_code.providers.kokoro_tts import KokoroTTSProvider
+from cadence_code.providers.moonshine_stt import MoonshineSTTProvider
+from cadence_code.providers.parakeet_stt import ParakeetSTTProvider
+from cadence_code.providers.pocket_tts import PocketTTSProvider
+from cadence_code.providers.qwen_tts import QwenTTSProvider
+from cadence_code.providers.whisper_stt import WhisperSTTProvider
 
 TTS_PROVIDERS = {
     "chatterbox": ChatterboxTTSProvider,

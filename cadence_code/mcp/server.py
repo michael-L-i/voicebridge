@@ -1,14 +1,14 @@
 from mcp.server.fastmcp import FastMCP
 
-from voicebridge.mcp.runtime import VoiceRuntime, VoiceSessionNotStarted
+from cadence_code.mcp.runtime import VoiceRuntime, VoiceSessionNotStarted
 
 mcp = FastMCP(
-    "voicebridge",
+    "cadence-code",
     instructions=(
-        "Local speech input and output for explicit VoiceBridge conversations. "
-        "Model configuration tools may be used during explicit VoiceBridge setup. "
+        "Local speech input and output for explicit Cadence Code conversations. "
+        "Model configuration tools may be used during explicit Cadence Code setup. "
         "Only call audio tools after the user explicitly asks to start or continue "
-        "a VoiceBridge voice conversation."
+        "a Cadence Code voice conversation."
     ),
 )
 runtime = VoiceRuntime()
@@ -46,7 +46,7 @@ def voice_configure(tts: str, stt: str) -> dict:
 def voice_start() -> dict:
     """Start a local voice conversation and load the TTS and STT models.
 
-    Call only after an explicit user request for a VoiceBridge conversation,
+    Call only after an explicit user request for a Cadence Code conversation,
     once before the first voice_speak. The initial call checks microphone and
     speaker access before local model files are downloaded or loaded; later
     turns reuse the warm models. Only one conversation can be active per Mac."""
@@ -68,7 +68,7 @@ def voice_speak(
     bullet lists, or file paths. The text is spoken verbatim and is never
     summarized or rewritten locally. Returns once playback starts so the host
     can stream its written response while speech continues. Set listen_after
-    when this speech ends a turn: VoiceBridge will open the mic immediately
+    when this speech ends a turn: Cadence Code will open the mic immediately
     after playback, and the subsequent voice_listen call collects that queued
     capture instead of starting late. Leave it false for progress updates that
     are followed by work rather than a user reply. Requires a successful
@@ -109,7 +109,7 @@ def voice_interrupt(
     timeout_ms: int | None = None,
     silence_ms: int | None = None,
 ) -> dict:
-    """Interrupt current VoiceBridge audio and capture added guidance.
+    """Interrupt current Cadence Code audio and capture added guidance.
 
     Use after the user interrupts the host's current turn. Any active speech or
     queued microphone capture is cancelled, the warmed models remain loaded,

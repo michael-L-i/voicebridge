@@ -3,19 +3,19 @@ import time
 
 import click
 
-from voicebridge.config import CONFIG_PATH, ensure_config_exists, load_config
+from cadence_code.config import CONFIG_PATH, ensure_config_exists, load_config
 
 MIN_FREE_GB_RECOMMENDED = 10
 
 
 @click.group()
 def main():
-    """voicebridge: a fully local voice companion for coding agents."""
+    """cadence-code: a fully local voice companion for coding agents."""
 
 
 @main.command()
 def doctor():
-    """Check that this machine can run voicebridge (audio I/O, Metal, disk space)."""
+    """Check that this machine can run cadence-code (audio I/O, Metal, disk space)."""
     ok = True
 
     path = ensure_config_exists()
@@ -88,8 +88,8 @@ def listen_test(silence_ms: int | None, max_listen_ms: int | None):
     """Record from the mic, transcribe with the configured STT provider, and
     print the result and latency -- for validating mic capture and STT
     accuracy directly, without going through the MCP server."""
-    from voicebridge.audio.capture import listen
-    from voicebridge.providers.registry import get_stt_provider
+    from cadence_code.audio.capture import listen
+    from cadence_code.providers.registry import get_stt_provider
 
     cfg = load_config()
     provider = get_stt_provider(cfg.stt).load()

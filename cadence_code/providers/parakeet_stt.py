@@ -2,9 +2,9 @@ import mlx.core as mx
 import numpy as np
 from mlx_audio.stt.utils import load_model
 
-from voicebridge.config import STTConfig
-from voicebridge.providers.base import STTProvider
-from voicebridge.providers.output import model_output_to_stderr
+from cadence_code.config import STTConfig
+from cadence_code.providers.base import STTProvider
+from cadence_code.providers.output import model_output_to_stderr
 
 
 class ParakeetSTTProvider(STTProvider):

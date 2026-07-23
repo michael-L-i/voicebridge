@@ -4,7 +4,7 @@ from pathlib import Path
 
 import sounddevice as sd
 
-from voicebridge.audio.playback import audio_lock
+from cadence_code.audio.playback import audio_lock
 
 MIN_FREE_GB_RECOMMENDED = 10
 _MIC_SAMPLE_RATE = 16000

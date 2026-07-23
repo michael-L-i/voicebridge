@@ -1,7 +1,7 @@
 interface:
-  display_name: "VoiceBridge Settings"
+  display_name: "Cadence Code Settings"
   short_description: "Choose local speech and transcription models"
-  default_prompt: "Use $voice-settings to choose VoiceBridge models."
+  default_prompt: "Use $voice-settings to choose Cadence Code models."
 
 policy:
   allow_implicit_invocation: false

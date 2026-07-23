@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions and setup help
-    url: https://github.com/michael-L-i/voicebridge/discussions
+    url: https://github.com/michael-L-i/cadence-code/discussions
     about: Ask for installation, configuration, or usage help.
   - name: Private security report
-    url: https://github.com/michael-L-i/voicebridge/security/advisories/new
+    url: https://github.com/michael-L-i/cadence-code/security/advisories/new
     about: Report a suspected vulnerability privately.

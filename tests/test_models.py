@@ -1,6 +1,6 @@
 import unittest
 
-from voicebridge.models import (
+from cadence_code.models import (
     DEFAULT_STT_MODEL,
     DEFAULT_TTS_MODEL,
     STT_MODELS,

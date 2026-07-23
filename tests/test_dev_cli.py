@@ -37,8 +37,8 @@ class DevCliTests(unittest.TestCase):
             data_root = temp / "data"
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_NPX_BIN": str(fake_npx),
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_NPX_BIN": str(fake_npx),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
             }
 
             result = subprocess.run(
@@ -52,10 +52,10 @@ class DevCliTests(unittest.TestCase):
         arguments = result.stdout.splitlines()
         self.assertIn("@modelcontextprotocol/inspector", arguments)
         self.assertIn(
-            f"VOICEBRIDGE_DATA_DIR={data_root.resolve()}/inspector", arguments
+            f"CADENCE_CODE_DATA_DIR={data_root.resolve()}/inspector", arguments
         )
-        self.assertIn("VOICEBRIDGE_HOST=inspector", arguments)
-        self.assertIn(str(ROOT / "bin/voicebridge-mcp-bootstrap"), arguments)
+        self.assertIn("CADENCE_CODE_HOST=inspector", arguments)
+        self.assertIn(str(ROOT / "bin/cadence-code-mcp-bootstrap"), arguments)
 
     def test_claude_loads_checkout_directly_with_development_data(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -64,7 +64,7 @@ class DevCliTests(unittest.TestCase):
             fake_claude.write_text(
                 "#!/bin/bash\n"
                 "printf 'cwd=%s\\n' \"$PWD\"\n"
-                "printf 'data=%s\\n' \"$VOICEBRIDGE_DEV_DATA_DIR\"\n"
+                "printf 'data=%s\\n' \"$CADENCE_CODE_DEV_DATA_DIR\"\n"
                 "printf 'arg=%s\\n' \"$@\"\n",
                 encoding="utf-8",
             )
@@ -72,8 +72,8 @@ class DevCliTests(unittest.TestCase):
             data_root = temp / "data"
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_CLAUDE_BIN": str(fake_claude),
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_CLAUDE_BIN": str(fake_claude),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
             }
 
             result = subprocess.run(
@@ -111,8 +111,8 @@ class DevCliTests(unittest.TestCase):
             keep.write_text("warm\n")
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_CLAUDE_BIN": str(fake_claude),
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_CLAUDE_BIN": str(fake_claude),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
             }
 
             result = subprocess.run(
@@ -143,8 +143,8 @@ class DevCliTests(unittest.TestCase):
             data_root = temp / "data"
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_CODEX_BIN": str(fake_codex),
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_CODEX_BIN": str(fake_codex),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
             }
 
             result = subprocess.run(
@@ -160,20 +160,20 @@ class DevCliTests(unittest.TestCase):
         self.assertIn("arg=-C", arguments)
         self.assertIn(f"arg={ROOT}", arguments)
         self.assertIn(
-            "arg=mcp_servers.voicebridge.command="
-            f"{ROOT}/bin/voicebridge-mcp-bootstrap",
+            "arg=mcp_servers.cadence-code.command="
+            f"{ROOT}/bin/cadence-code-mcp-bootstrap",
             arguments,
         )
         self.assertIn(
-            "arg=mcp_servers.voicebridge.env.VOICEBRIDGE_DATA_DIR="
+            "arg=mcp_servers.cadence-code.env.CADENCE_CODE_DATA_DIR="
             f"{data_root.resolve()}/codex",
             arguments,
         )
         self.assertIn(
-            "arg=mcp_servers.voicebridge.env.VOICEBRIDGE_HOST=codex",
+            "arg=mcp_servers.cadence-code.env.CADENCE_CODE_HOST=codex",
             arguments,
         )
-        self.assertIn("arg=mcp_servers.voicebridge.required=true", arguments)
+        self.assertIn("arg=mcp_servers.cadence-code.required=true", arguments)
         self.assertNotIn("plugin", " ".join(arguments))
         self.assertNotIn("marketplace", " ".join(arguments))
 
@@ -213,8 +213,8 @@ class DevCliTests(unittest.TestCase):
             keep.write_text("warm\n")
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_CODEX_BIN": str(fake_codex),
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_CODEX_BIN": str(fake_codex),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
             }
 
             result = subprocess.run(
@@ -234,7 +234,7 @@ class DevCliTests(unittest.TestCase):
     def test_reset_removes_only_guarded_development_root(self):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
-            data_root = temp / ".voicebridge-dev"
+            data_root = temp / ".cadence-code-dev"
             (data_root / "codex/venv").mkdir(parents=True)
             (data_root / "codex/config.toml").write_text("configured\n")
             fake_pgrep = temp / "pgrep"
@@ -248,9 +248,9 @@ class DevCliTests(unittest.TestCase):
             fake_trash.chmod(0o755)
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
-                "VOICEBRIDGE_DEV_PGREP_BIN": str(fake_pgrep),
-                "VOICEBRIDGE_DEV_TRASH_BIN": str(fake_trash),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_PGREP_BIN": str(fake_pgrep),
+                "CADENCE_CODE_DEV_TRASH_BIN": str(fake_trash),
             }
 
             result = subprocess.run(
@@ -265,18 +265,18 @@ class DevCliTests(unittest.TestCase):
             self.assertFalse(data_root.exists())
         self.assertIn("to Trash", result.stdout)
 
-    def test_reset_refuses_while_voicebridge_process_is_running(self):
+    def test_reset_refuses_while_cadence_code_process_is_running(self):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
-            data_root = temp / ".voicebridge-dev"
+            data_root = temp / ".cadence-code-dev"
             data_root.mkdir()
             fake_pgrep = temp / "pgrep"
             fake_pgrep.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
             fake_pgrep.chmod(0o755)
             env = {
                 **os.environ,
-                "VOICEBRIDGE_DEV_DATA_ROOT": str(data_root),
-                "VOICEBRIDGE_DEV_PGREP_BIN": str(fake_pgrep),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
+                "CADENCE_CODE_DEV_PGREP_BIN": str(fake_pgrep),
             }
 
             result = subprocess.run(
@@ -289,7 +289,7 @@ class DevCliTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue(data_root.exists())
-        self.assertIn("stop every VoiceBridge host session", result.stderr)
+        self.assertIn("stop every Cadence Code host session", result.stderr)
 
 
 if __name__ == "__main__":

@@ -1,12 +1,12 @@
 # Support
 
-Use [GitHub Discussions](https://github.com/michael-L-i/voicebridge/discussions)
+Use [GitHub Discussions](https://github.com/michael-L-i/cadence-code/discussions)
 for installation help, configuration questions, and ideas that are not yet
 actionable bug reports.
 
-Use the structured [issue forms](https://github.com/michael-L-i/voicebridge/issues/new/choose)
+Use the structured [issue forms](https://github.com/michael-L-i/cadence-code/issues/new/choose)
 for reproducible bugs and concrete feature proposals. Search existing issues
-first and include the VoiceBridge version, macOS version, Mac model, Python
+first and include the Cadence Code version, macOS version, Mac model, Python
 version, and relevant redacted logs.
 
 Security reports must remain private; follow [SECURITY.md](SECURITY.md). Code of

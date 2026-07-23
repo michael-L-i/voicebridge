@@ -1,9 +1,9 @@
 #!/bin/bash
 # Declared as this plugin's MCP server command in the plugin manifest. Ensures a
-# private venv with voicebridge + its local speech deps (mlx-audio, misaki,
+# private venv with cadence-code + its local speech deps (mlx-audio, misaki,
 # spacy, ...) exists under the selected data directory, building it on first
 # run (or after a plugin update changes the locked dependencies), then execs
-# into the real voicebridge-mcp entrypoint inside that venv.
+# into the real cadence-code-mcp entrypoint inside that venv.
 #
 # IMPORTANT: stdout is the live MCP stdio JSON-RPC channel. Every log line in
 # this script MUST go to stderr (>&2) -- writing anything to stdout before
@@ -14,32 +14,32 @@ SETUP_ONLY=0
 if [ "${1:-}" = "--setup" ] && [ "$#" = "1" ]; then
   SETUP_ONLY=1
 elif [ "$#" != "0" ]; then
-  echo "[voicebridge] ERROR: expected no arguments or --setup." >&2
+  echo "[cadence-code] ERROR: expected no arguments or --setup." >&2
   exit 64
 fi
 
 PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-DATA_DIR="${VOICEBRIDGE_DEV_DATA_DIR:-${VOICEBRIDGE_DATA_DIR:-${HOME}/.voicebridge}}"
+DATA_DIR="${CADENCE_CODE_DEV_DATA_DIR:-${CADENCE_CODE_DATA_DIR:-${HOME}/.cadence-code}}"
 VENV_DIR="${DATA_DIR}/venv"
-MARKER_FILE="${VENV_DIR}/.voicebridge-install-marker"
+MARKER_FILE="${VENV_DIR}/.cadence-code-install-marker"
 INSTALL_LOCK_DIR="${DATA_DIR}/.venv-install.lock"
 INSTALL_LOCK_OWNER="${INSTALL_LOCK_DIR}/owner"
 PYPROJECT="${PLUGIN_ROOT}/pyproject.toml"
 REQUIREMENTS="${PLUGIN_ROOT}/requirements.lock"
 
 if [ "$(uname -s)" != "Darwin" ]; then
-  echo "[voicebridge] ERROR: VoiceBridge requires macOS on Apple Silicon." >&2
+  echo "[cadence-code] ERROR: Cadence Code requires macOS on Apple Silicon." >&2
   exit 1
 fi
 if [ "$(uname -m)" != "arm64" ]; then
-  echo "[voicebridge] ERROR: VoiceBridge requires an Apple Silicon (arm64) shell." >&2
+  echo "[cadence-code] ERROR: Cadence Code requires an Apple Silicon (arm64) shell." >&2
   exit 1
 fi
 
 mkdir -p "${DATA_DIR}"
 
 if [ ! -f "${REQUIREMENTS}" ]; then
-  echo "[voicebridge] ERROR: bundled dependency lock is missing:" >&2
+  echo "[cadence-code] ERROR: bundled dependency lock is missing:" >&2
   echo "  ${REQUIREMENTS}" >&2
   exit 1
 fi
@@ -50,7 +50,7 @@ CURRENT_HASH=$(shasum -a 256 "${PYPROJECT}" "${REQUIREMENTS}" | \
   awk '{print $1}' | shasum -a 256 | awk '{print $1}')
 
 environment_is_current() {
-  [ -x "${VENV_DIR}/bin/voicebridge-mcp" ] && \
+  [ -x "${VENV_DIR}/bin/cadence-code-mcp" ] && \
     [ -f "${MARKER_FILE}" ] && \
     [ "$(cat "${MARKER_FILE}")" = "${CURRENT_HASH}" ]
 }
@@ -141,7 +141,7 @@ acquire_install_lock() {
       # Moving the inspected record is an atomic claim: only one waiter can
       # reap it, and no reaper ever removes a later owner's record.
       if reap_install_lock "${OWNER_RECORD}" \
-           "[voicebridge] recovered a stale installer lock."; then
+           "[cadence-code] recovered a stale installer lock."; then
         continue
       fi
     else
@@ -151,7 +151,7 @@ acquire_install_lock() {
       INCOMPLETE_OWNER_ROUNDS=$((INCOMPLETE_OWNER_ROUNDS + 1))
       if [ "${INCOMPLETE_OWNER_ROUNDS}" -ge 5 ]; then
         if reap_install_lock "${OWNER_RECORD}" \
-             "[voicebridge] recovered an incomplete installer lock."; then
+             "[cadence-code] recovered an incomplete installer lock."; then
           continue
         fi
         INCOMPLETE_OWNER_ROUNDS=0
@@ -159,7 +159,7 @@ acquire_install_lock() {
     fi
 
     if [ "${WAITING_FOR_LOCK}" = "0" ]; then
-      echo "[voicebridge] waiting for another VoiceBridge setup to finish." >&2
+      echo "[cadence-code] waiting for another Cadence Code setup to finish." >&2
       WAITING_FOR_LOCK=1
     fi
     sleep 1
@@ -167,7 +167,7 @@ acquire_install_lock() {
 
   if ! printf '%s\n' "${LOCK_RECORD}" > "${INSTALL_LOCK_OWNER}"; then
     rmdir "${INSTALL_LOCK_DIR}" 2>/dev/null || true
-    echo "[voicebridge] ERROR: could not record installer lock ownership." >&2
+    echo "[cadence-code] ERROR: could not record installer lock ownership." >&2
     exit 1
   fi
   HAVE_INSTALL_LOCK=1
@@ -181,21 +181,21 @@ if ! environment_is_current; then
   if environment_is_current; then
     release_install_lock
     trap - EXIT
-    exec "${VENV_DIR}/bin/voicebridge-mcp"
+    exec "${VENV_DIR}/bin/cadence-code-mcp"
   fi
 
-  echo "[voicebridge] setting up local voice dependencies -- first run only," \
+  echo "[cadence-code] setting up local voice dependencies -- first run only," \
        "can take a few minutes (model weights download" \
        "when voice mode starts for the first time)." >&2
 
-  PYTHON_BIN="${VOICEBRIDGE_PYTHON:-}"
+  PYTHON_BIN="${CADENCE_CODE_PYTHON:-}"
   if [ -z "${PYTHON_BIN}" ]; then
     PYTHON_BIN=$(command -v python3.14 || command -v python3.13 || \
       command -v python3.12 || \
       command -v python3.11 || command -v python3 || true)
   fi
   if [ -z "${PYTHON_BIN}" ]; then
-    echo "[voicebridge] ERROR: no python3 found on PATH. Install Python 3.11" \
+    echo "[cadence-code] ERROR: no python3 found on PATH. Install Python 3.11" \
          "through 3.14 (e.g. brew install python@3.14) and start a new session." >&2
     exit 1
   fi
@@ -207,7 +207,7 @@ if ! environment_is_current; then
     'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 15)))'; then
     PYTHON_VERSION=$("${PYTHON_BIN}" -c \
       'import sys; print(".".join(map(str, sys.version_info[:3])))')
-    echo "[voicebridge] ERROR: Python 3.11 through 3.14 is required;" \
+    echo "[cadence-code] ERROR: Python 3.11 through 3.14 is required;" \
          "found ${PYTHON_VERSION}." >&2
     echo "  Install it with: brew install python@3.14" >&2
     exit 1
@@ -258,7 +258,7 @@ if ! environment_is_current; then
     copying { print }
   ' "${REQUIREMENTS}" > "${MISAKI_REQUIREMENT}"
   if ! grep -q '^misaki==' "${MISAKI_REQUIREMENT}"; then
-    echo "[voicebridge] ERROR: locked Misaki requirement is missing." >&2
+    echo "[cadence-code] ERROR: locked Misaki requirement is missing." >&2
     exit 1
   fi
   if ! "${BUILD_DIR}/bin/pip" install --quiet --require-hashes \
@@ -267,11 +267,11 @@ if ! environment_is_current; then
     -r "${REQUIREMENTS}" >&2 || \
      ! "${BUILD_DIR}/bin/pip" install --quiet --no-deps \
     -e "${PLUGIN_ROOT}" >&2; then
-    echo "[voicebridge] ERROR: locked dependency install failed." >&2
+    echo "[cadence-code] ERROR: locked dependency install failed." >&2
     echo "  The previous environment is unchanged; restart to retry." >&2
     exit 1
   fi
-  echo "${CURRENT_HASH}" > "${BUILD_DIR}/.voicebridge-install-marker"
+  echo "${CURRENT_HASH}" > "${BUILD_DIR}/.cadence-code-install-marker"
 
   NEXT_LINK=$(mktemp -d "${DATA_DIR}/.venv-link.XXXXXX")
   rmdir "${NEXT_LINK}"
@@ -291,7 +291,7 @@ if ! environment_is_current; then
     mv "${VENV_DIR}" "${OLD_TARGET}"
     if ! mv "${NEXT_LINK}" "${VENV_DIR}"; then
       mv "${OLD_TARGET}" "${VENV_DIR}"
-      echo "[voicebridge] ERROR: could not activate the new environment." >&2
+      echo "[cadence-code] ERROR: could not activate the new environment." >&2
       exit 1
     fi
   else
@@ -308,11 +308,11 @@ if ! environment_is_current; then
   esac
   release_install_lock
   trap - EXIT
-  echo "[voicebridge] setup complete." >&2
+  echo "[cadence-code] setup complete." >&2
 fi
 
 if [ "${SETUP_ONLY}" = "1" ]; then
   exit 0
 fi
 
-exec "${VENV_DIR}/bin/voicebridge-mcp"
+exec "${VENV_DIR}/bin/cadence-code-mcp"

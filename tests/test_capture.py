@@ -12,7 +12,7 @@ try:
 except ImportError:
     sys.modules["webrtcvad"] = SimpleNamespace(Vad=lambda *args: None)
 
-from voicebridge.audio import capture
+from cadence_code.audio import capture
 
 
 class _FakeVad:

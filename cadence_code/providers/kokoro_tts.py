@@ -3,9 +3,9 @@ import re
 import numpy as np
 from mlx_audio.tts.utils import load_model
 
-from voicebridge.config import TTSConfig
-from voicebridge.providers.base import TTSProvider
-from voicebridge.providers.output import model_output_to_stderr
+from cadence_code.config import TTSConfig
+from cadence_code.providers.base import TTSProvider
+from cadence_code.providers.output import model_output_to_stderr
 
 # mlx-audio's Kokoro vocoder has a reproducible shape-mismatch bug
 # (`broadcast_shapes` in its ISTFT harmonic-source generator) that depends on

@@ -1,6 +1,6 @@
 [project]
-name = "voicebridge"
-version = "0.5.0"
+name = "cadence-code"
+version = "0.6.0"
 description = "Local voice conversations for Codex and Claude Code on Apple Silicon"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
@@ -65,17 +65,17 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/michael-L-i/voicebridge"
-Issues = "https://github.com/michael-L-i/voicebridge/issues"
-Repository = "https://github.com/michael-L-i/voicebridge"
+Homepage = "https://github.com/michael-L-i/cadence-code"
+Issues = "https://github.com/michael-L-i/cadence-code/issues"
+Repository = "https://github.com/michael-L-i/cadence-code"
 
 [project.scripts]
-voicebridge = "voicebridge.cli:main"
-voicebridge-mcp = "voicebridge.mcp.server:main"
+cadence-code = "cadence_code.cli:main"
+cadence-code-mcp = "cadence_code.mcp.server:main"
 
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["voicebridge*"]
+include = ["cadence_code*"]

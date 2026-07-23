@@ -3,6 +3,6 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("voicebridge")
+    __version__ = version("cadence-code")
 except PackageNotFoundError:
     __version__ = "development"

@@ -5,7 +5,7 @@ import numpy as np
 import sounddevice as sd
 
 # One global lock covers both TTS playback and mic capture. Without echo
-# cancellation, serializing them prevents VoiceBridge from hearing itself.
+# cancellation, serializing them prevents Cadence Code from hearing itself.
 audio_lock = threading.Lock()
 
 _CHIME_SAMPLE_RATE = 24000
@@ -36,7 +36,7 @@ class PlaybackHandle:
         self._thread = threading.Thread(
             target=self._run,
             args=(audio, sample_rate, device),
-            name="voicebridge-playback",
+            name="cadence-code-playback",
             daemon=True,
         )
         self._thread.start()

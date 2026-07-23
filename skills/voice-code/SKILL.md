@@ -1,15 +1,15 @@
 ---
 name: voice-code
-description: Start and run an explicit, interactive VoiceBridge conversation with Codex using fully local speech input and output. Use only when the user explicitly invokes $voice-code or asks to start a VoiceBridge voice conversation.
+description: Start and run an explicit, interactive Cadence Code conversation with Codex using fully local speech input and output. Use only when the user explicitly invokes $voice-code or asks to start a Cadence Code voice conversation.
 ---
 
 # Voice Code
 
-Run a deliberate voice loop through the `mcp__voicebridge__voice_status`,
-`mcp__voicebridge__voice_models`, `mcp__voicebridge__voice_configure`,
-`mcp__voicebridge__voice_start`, `mcp__voicebridge__voice_speak`,
-`mcp__voicebridge__voice_listen`, and `mcp__voicebridge__voice_stop` tools.
-VoiceBridge only performs speech input and output. Codex controls the
+Run a deliberate voice loop through the `mcp__cadence-code__voice_status`,
+`mcp__cadence-code__voice_models`, `mcp__cadence-code__voice_configure`,
+`mcp__cadence-code__voice_start`, `mcp__cadence-code__voice_speak`,
+`mcp__cadence-code__voice_listen`, and `mcp__cadence-code__voice_stop` tools.
+Cadence Code only performs speech input and output. Codex controls the
 conversation and authors every word sent to speech.
 
 Maintain two outputs for completed work:
@@ -24,7 +24,7 @@ Maintain two outputs for completed work:
    rearrange, restyle, or generate any part of it from the model response.
 
    ```text
-   +-- WELCOME TO VOICEBRIDGE -----------------------------------------+
+   +-- WELCOME TO CADENCE_CODE -----------------------------------------+
    |
    | Let's talk through whatever you're working on.
    |
@@ -58,7 +58,7 @@ Maintain two outputs for completed work:
    Existing users with `first_run: false` skip the fixed script and automatic
    default configuration silently.
 2. Call `voice_start` and wait for the audio preflight and local speech models.
-   Do not call any VoiceBridge audio tool before this explicit skill invocation.
+   Do not call any Cadence Code audio tool before this explicit skill invocation.
    If it returns `ok: false`, show the error and end without retrying.
 3. Verify the result includes `version`, `host`, `capture`, and `preflight`, and
    that `host` is `codex`. If not, the MCP process is stale or misconfigured:
@@ -66,11 +66,11 @@ Maintain two outputs for completed work:
    or reinstalling the plugin, and end.
 4. Speak a greeting with `listen_after: true`, then call `voice_listen`
    immediately. If `first_run` was true, use this short introduction verbatim:
-   "Welcome to VoiceBridge. We can talk through whatever you're working on:
+   "Welcome to Cadence Code. We can talk through whatever you're working on:
    after the chime, speak naturally, and I'll reply aloud while keeping the
    useful details on screen. If you want to redirect me, press Escape and choose
    Voice Interrupt; I'm listening, so what would you like to work on?"
-   Otherwise use an ordinary casual one-sentence greeting. VoiceBridge opens
+   Otherwise use an ordinary casual one-sentence greeting. Cadence Code opens
    the mic as soon as playback finishes and the listen call collects that
    queued capture. Do not add filler or perform other work between those tool
    calls.
@@ -82,7 +82,7 @@ Maintain two outputs for completed work:
    `voice_speak` first with `listen_after: true` and a separately composed
    concise summary. As soon as it returns, stream the complete written result
    while the summary is still playing so text appears as the user listens.
-   VoiceBridge opens the mic immediately when playback ends even if writing is
+   Cadence Code opens the mic immediately when playback ends even if writing is
    still in progress; call `voice_listen` after the written result to collect
    that capture.
 7. When a decision is needed, show detailed options in writing and speak only
@@ -90,7 +90,7 @@ Maintain two outputs for completed work:
 8. After presenting each written result, call `voice_listen` to collect the
    capture queued by the preceding end-of-turn speech. A valid transcript
    resets the consecutive no-speech timeout count.
-9. VoiceBridge internally discards noise segments that transcribe to no words.
+9. Cadence Code internally discards noise segments that transcribe to no words.
    After one remaining no-speech timeout, check in once. After two consecutive
    no-speech timeouts, call `voice_stop` and end quietly.
 10. On `end_reason: "device_error"`, explain the microphone problem briefly when
@@ -107,5 +107,5 @@ never between turns. Keep speech brief unless the user explicitly requests a
 spoken walkthrough.
 
 If the user presses Escape during a turn, they can invoke `$voice-interrupt` to
-silence current VoiceBridge audio and add spoken guidance without unloading the
+silence current Cadence Code audio and add spoken guidance without unloading the
 models. The separate interrupt skill owns that recovery workflow.

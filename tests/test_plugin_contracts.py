@@ -20,25 +20,25 @@ class PluginContractTests(unittest.TestCase):
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
 
-        self.assertEqual(project_version, "0.5.0")
+        self.assertEqual(project_version, "0.6.0")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
         self.assertEqual(
-            claude["mcpServers"]["voicebridge"]["env"]["VOICEBRIDGE_HOST"],
+            claude["mcpServers"]["cadence-code"]["env"]["CADENCE_CODE_HOST"],
             "claude-code",
         )
         self.assertEqual(codex["skills"], "./skills/")
 
     def test_codex_manifest_bundles_mcp_without_project_config(self):
         codex = _json(".codex-plugin/plugin.json")
-        server = codex["mcpServers"]["voicebridge"]
+        server = codex["mcpServers"]["cadence-code"]
 
         self.assertFalse((ROOT / ".mcp.json").exists())
         self.assertEqual(server["type"], "stdio")
         self.assertEqual(server["command"], "bash")
-        self.assertEqual(server["args"], ["./bin/voicebridge-mcp-bootstrap"])
+        self.assertEqual(server["args"], ["./bin/cadence-code-mcp-bootstrap"])
         self.assertEqual(server["cwd"], ".")
-        self.assertEqual(server["env"]["VOICEBRIDGE_HOST"], "codex")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "codex")
         self.assertEqual(server["startup_timeout_sec"], 900)
         self.assertEqual(server["tool_timeout_sec"], 1800)
         self.assertEqual(server["default_tools_approval_mode"], "approve")
@@ -47,8 +47,8 @@ class PluginContractTests(unittest.TestCase):
         marketplace = _json(".agents/plugins/marketplace.json")
         entry = marketplace["plugins"][0]
 
-        self.assertEqual(marketplace["name"], "voicebridge-marketplace")
-        self.assertEqual(entry["name"], "voicebridge")
+        self.assertEqual(marketplace["name"], "cadence-code-marketplace")
+        self.assertEqual(entry["name"], "cadence-code")
         self.assertEqual(entry["source"], {"source": "local", "path": "./"})
         self.assertEqual(entry["policy"]["installation"], "AVAILABLE")
         self.assertEqual(entry["policy"]["authentication"], "ON_INSTALL")
@@ -75,9 +75,9 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("before any", skill)
         self.assertIn("model download", skill)
         for tool in expected_tools:
-            self.assertIn(f"mcp__voicebridge__{tool}", skill)
-            self.assertIn(f"mcp__voicebridge__{tool}", command)
-        self.assertIn("voicebridge-mcp-bootstrap --setup", command)
+            self.assertIn(f"mcp__cadence-code__{tool}", skill)
+            self.assertIn(f"mcp__cadence-code__{tool}", command)
+        self.assertIn("cadence-code-mcp-bootstrap --setup", command)
         self.assertIn("/reload-plugins", command)
         self.assertIn("If `first_run` is true", command)
         self.assertIn('error_code: "session_not_started"', skill)
@@ -90,7 +90,7 @@ class PluginContractTests(unittest.TestCase):
         for workflow in (codex, claude):
             normalized = " ".join(workflow.split())
             self.assertIn("reproduce this fixed onboarding script verbatim", normalized)
-            self.assertIn("WELCOME TO VOICEBRIDGE", normalized)
+            self.assertIn("WELCOME TO CADENCE_CODE", normalized)
             self.assertIn("YOU SPEAK -> I WORK", normalized)
             self.assertIn("We alternate turns", normalized)
             self.assertIn("the microphone opens again", normalized)
@@ -106,7 +106,7 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("Do not present a model selector", normalized)
             self.assertIn("or wait for confirmation", normalized)
             self.assertIn(
-                "Welcome to VoiceBridge. We can talk through whatever", normalized
+                "Welcome to Cadence Code. We can talk through whatever", normalized
             )
             self.assertIn("press Escape", normalized)
             self.assertIn("choose Voice Interrupt", normalized)
@@ -114,9 +114,9 @@ class PluginContractTests(unittest.TestCase):
         for command in ("$voice-code", "$voice-settings", "$voice-interrupt"):
             self.assertIn(command, codex)
         for command in (
-            "/voicebridge:voice-code",
-            "/voicebridge:voice-settings",
-            "/voicebridge:voice-interrupt",
+            "/cadence-code:voice-code",
+            "/cadence-code:voice-settings",
+            "/cadence-code:voice-interrupt",
         ):
             self.assertIn(command, claude)
 
@@ -134,19 +134,19 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("explicitly invokes $voice-settings", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
         for tool in {"voice_status", "voice_models", "voice_configure", "voice_stop"}:
-            self.assertIn(f"mcp__voicebridge__{tool}", skill)
-            self.assertIn(f"mcp__voicebridge__{tool}", command)
-        self.assertIn("Do not call `mcp__voicebridge__voice_start`", skill)
-        self.assertIn("Do not call `mcp__voicebridge__voice_start`", command)
+            self.assertIn(f"mcp__cadence-code__{tool}", skill)
+            self.assertIn(f"mcp__cadence-code__{tool}", command)
+        self.assertIn("Do not call `mcp__cadence-code__voice_start`", skill)
+        self.assertIn("Do not call `mcp__cadence-code__voice_start`", command)
 
         codex = _json(".codex-plugin/plugin.json")
         self.assertIn(
-            "Choose VoiceBridge speech and transcription models.",
+            "Choose Cadence Code speech and transcription models.",
             codex["interface"]["defaultPrompt"],
         )
 
     def test_server_exposes_only_the_eight_voice_tools(self):
-        source = (ROOT / "voicebridge/mcp/server.py").read_text(encoding="utf-8")
+        source = (ROOT / "cadence_code/mcp/server.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         tools = {
             node.name
@@ -188,14 +188,14 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $voice-interrupt", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
-        self.assertIn("mcp__voicebridge__voice_interrupt", skill)
-        self.assertIn("mcp__voicebridge__voice_interrupt", command)
+        self.assertIn("mcp__cadence-code__voice_interrupt", skill)
+        self.assertIn("mcp__cadence-code__voice_interrupt", command)
         self.assertIn("added guidance", skill)
         self.assertIn("added guidance", command)
         self.assertIn("Escape", command)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
-        bootstrap = ROOT / "bin/voicebridge-mcp-bootstrap"
+        bootstrap = ROOT / "bin/cadence-code-mcp-bootstrap"
         result = subprocess.run(
             ["bash", "-n", str(bootstrap)],
             check=False,
@@ -205,7 +205,7 @@ class PluginContractTests(unittest.TestCase):
         source = bootstrap.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("VOICEBRIDGE_DEV_DATA_DIR", source)
+        self.assertIn("CADENCE_CODE_DEV_DATA_DIR", source)
         self.assertIn('REQUIREMENTS="${PLUGIN_ROOT}/requirements.lock"', source)
         self.assertIn("--require-hashes", source)
         self.assertIn("--no-deps", source)

@@ -15,8 +15,8 @@ class BootstrapTests(unittest.TestCase):
         plugin = root / "plugin"
         (plugin / "bin").mkdir(parents=True)
         shutil.copy2(
-            ROOT / "bin/voicebridge-mcp-bootstrap",
-            plugin / "bin/voicebridge-mcp-bootstrap",
+            ROOT / "bin/cadence-code-mcp-bootstrap",
+            plugin / "bin/cadence-code-mcp-bootstrap",
         )
         (plugin / "pyproject.toml").write_text("[project]\nname = 'fixture'\n")
         (plugin / "requirements.lock").write_text(
@@ -45,7 +45,7 @@ fi
 if [ "$1" = "-m" ] && [ "$2" = "venv" ]; then
   mkdir -p "$3/bin"
   cp "$FAKE_PIP" "$3/bin/pip"
-  cp "$FAKE_SERVER" "$3/bin/voicebridge-mcp"
+  cp "$FAKE_SERVER" "$3/bin/cadence-code-mcp"
   exit 0
 fi
 exit 1
@@ -112,8 +112,8 @@ exec {shutil.which("mv")} "$@"
         data = root / "data"
         environment = {
             **os.environ,
-            "VOICEBRIDGE_DATA_DIR": str(data),
-            "VOICEBRIDGE_PYTHON": str(fake_python),
+            "CADENCE_CODE_DATA_DIR": str(data),
+            "CADENCE_CODE_PYTHON": str(fake_python),
             "FAKE_PIP": str(fake_pip),
             "FAKE_SERVER": str(fake_server),
             "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
@@ -121,7 +121,7 @@ exec {shutil.which("mv")} "$@"
             "INSTALL_LOG": str(root / "install.log"),
             "SERVER_EXEC_LOG": str(root / "server.log"),
         }
-        return plugin / "bin/voicebridge-mcp-bootstrap", data, environment
+        return plugin / "bin/cadence-code-mcp-bootstrap", data, environment
 
     def _run(
         self, bootstrap: Path, environment: dict[str, str]
@@ -141,9 +141,9 @@ exec {shutil.which("mv")} "$@"
     def _seed_legacy_environment(self, data: Path) -> Path:
         legacy = data / "venv"
         (legacy / "bin").mkdir(parents=True)
-        (legacy / "bin/voicebridge-mcp").write_text("working\n")
-        (legacy / "bin/voicebridge-mcp").chmod(0o755)
-        (legacy / ".voicebridge-install-marker").write_text("stale\n")
+        (legacy / "bin/cadence-code-mcp").write_text("working\n")
+        (legacy / "bin/cadence-code-mcp").chmod(0o755)
+        (legacy / ".cadence-code-install-marker").write_text("stale\n")
         return legacy
 
     def _assert_only_active_environment_remains(self, data: Path) -> None:
@@ -163,8 +163,8 @@ exec {shutil.which("mv")} "$@"
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((data / "venv").is_symlink())
-            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
-            self.assertTrue((data / "venv/.voicebridge-install-marker").is_file())
+            self.assertTrue((data / "venv/bin/cadence-code-mcp").is_file())
+            self.assertTrue((data / "venv/.cadence-code-install-marker").is_file())
             self.assertEqual(result.stdout, "")
             self._assert_only_active_environment_remains(data)
 
@@ -181,7 +181,7 @@ exec {shutil.which("mv")} "$@"
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, "")
-            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertTrue((data / "venv/bin/cadence-code-mcp").is_file())
             self.assertFalse(Path(environment["SERVER_EXEC_LOG"]).exists())
             self._assert_only_active_environment_remains(data)
 
@@ -190,7 +190,7 @@ exec {shutil.which("mv")} "$@"
             bootstrap, data, environment = self._fixture(Path(directory))
             first = self._run(bootstrap, environment)
             old_target = (data / "venv").resolve()
-            (data / "venv/.voicebridge-install-marker").write_text("stale\n")
+            (data / "venv/.cadence-code-install-marker").write_text("stale\n")
 
             result = self._run(bootstrap, environment)
 
@@ -207,7 +207,7 @@ exec {shutil.which("mv")} "$@"
             first = self._run(bootstrap, environment)
             old_link = os.readlink(data / "venv")
             old_target = (data / "venv").resolve()
-            (data / "venv/.voicebridge-install-marker").write_text("stale\n")
+            (data / "venv/.cadence-code-install-marker").write_text("stale\n")
             environment["FAIL_LOCK_INSTALL"] = "1"
 
             result = self._run(bootstrap, environment)
@@ -217,7 +217,7 @@ exec {shutil.which("mv")} "$@"
             self.assertTrue((data / "venv").is_symlink())
             self.assertEqual(os.readlink(data / "venv"), old_link)
             self.assertEqual((data / "venv").resolve(), old_target)
-            self.assertTrue((old_target / "bin/voicebridge-mcp").is_file())
+            self.assertTrue((old_target / "bin/cadence-code-mcp").is_file())
             self._assert_only_active_environment_remains(data)
 
     def test_concurrent_callers_share_one_install_and_both_run_server(self):
@@ -255,7 +255,7 @@ exec {shutil.which("mv")} "$@"
                 Path(environment["SERVER_EXEC_LOG"]).read_text().splitlines(),
                 ["server", "server"],
             )
-            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertTrue((data / "venv/bin/cadence-code-mcp").is_file())
             self.assertFalse((data / ".venv-install.lock").exists())
 
     def test_failed_installer_releases_waiter_to_retry(self):
@@ -311,7 +311,7 @@ exec {shutil.which("mv")} "$@"
             self.assertEqual(result.stdout, "")
             self.assertIn("recovered a stale installer lock", result.stderr)
             self.assertTrue(orphan_build.is_dir())
-            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertTrue((data / "venv/bin/cadence-code-mcp").is_file())
             self.assertFalse(lock.exists())
 
     def test_incomplete_installer_lock_from_early_crash_is_recovered(self):
@@ -331,7 +331,7 @@ exec {shutil.which("mv")} "$@"
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, "")
             self.assertIn("recovered an incomplete installer lock", result.stderr)
-            self.assertTrue((data / "venv/bin/voicebridge-mcp").is_file())
+            self.assertTrue((data / "venv/bin/cadence-code-mcp").is_file())
             self.assertFalse(lock.exists())
 
     def test_uses_bundled_pip_only_for_locked_runtime_and_local_project(self):
@@ -390,7 +390,7 @@ exec {shutil.which("mv")} "$@"
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(legacy.is_symlink())
             self.assertEqual(
-                (legacy / "bin/voicebridge-mcp").read_text(), "working\n"
+                (legacy / "bin/cadence-code-mcp").read_text(), "working\n"
             )
             self._assert_only_active_environment_remains(data)
 
@@ -406,7 +406,7 @@ exec {shutil.which("mv")} "$@"
             self.assertIn("could not activate", result.stderr)
             self.assertFalse(legacy.is_symlink())
             self.assertEqual(
-                (legacy / "bin/voicebridge-mcp").read_text(), "working\n"
+                (legacy / "bin/cadence-code-mcp").read_text(), "working\n"
             )
             self._assert_only_active_environment_remains(data)
 
@@ -421,7 +421,7 @@ exec {shutil.which("mv")} "$@"
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(legacy.is_symlink())
             self.assertEqual(
-                (legacy / "bin/voicebridge-mcp").read_text(), "working\n"
+                (legacy / "bin/cadence-code-mcp").read_text(), "working\n"
             )
             self._assert_only_active_environment_remains(data)
 
@@ -435,8 +435,8 @@ exec {shutil.which("mv")} "$@"
 
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue(legacy.is_symlink())
-            self.assertTrue((legacy / "bin/voicebridge-mcp").is_file())
-            self.assertTrue((legacy / ".voicebridge-install-marker").is_file())
+            self.assertTrue((legacy / "bin/cadence-code-mcp").is_file())
+            self.assertTrue((legacy / ".cadence-code-install-marker").is_file())
             self._assert_only_active_environment_remains(data)
 
 

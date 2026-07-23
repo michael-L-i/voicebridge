@@ -9,9 +9,9 @@ from pathlib import Path
 from pydantic import BaseModel
 
 # Claude Code sets this to its persistent per-plugin data directory. Codex and
-# direct development use ~/.voicebridge. The machine-wide audio-session lock is
+# direct development use ~/.cadence-code. The machine-wide audio-session lock is
 # deliberately separate so every host contends on the same lock.
-CONFIG_DIR = Path(os.environ.get("VOICEBRIDGE_DATA_DIR", str(Path.home() / ".voicebridge")))
+CONFIG_DIR = Path(os.environ.get("CADENCE_CODE_DATA_DIR", str(Path.home() / ".cadence-code")))
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default_config.toml"
 _SECTION_HEADER = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
