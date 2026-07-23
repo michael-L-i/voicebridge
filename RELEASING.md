@@ -67,8 +67,8 @@ For every path:
   source commit and manifest version.
 - Confirm `voice_status` reports the new version and the correct host
   (`codex` or `claude-code`) after the required host restart.
-- Start Voice Code, speak a response, listen and transcribe a reply, exercise
-  the explicit interrupt flow, then stop and confirm the session releases.
+- Invoke Start Talking, speak a response, listen and transcribe a reply,
+  exercise Jump In, then use Wrap Up and confirm the session releases.
 - Start a second new host process and repeat the status/start/stop smoke test to
   catch stale MCP processes and restart-only failures.
 

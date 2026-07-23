@@ -43,7 +43,7 @@ Usage: ./dev claude [--fresh] [claude-options]
 
 Launch Claude Code from the repository root with this checkout loaded through
 --plugin-dir. Nothing is installed from a marketplace. Inside Claude Code, run
-/cadence-code:voice-code to start the local voice flow. Use --fresh to clear the
+/cadence-code:start-talking to start the local voice flow. Use --fresh to clear the
 development configuration and onboarding marker while keeping the private venv.
 EOF
 }
@@ -54,7 +54,7 @@ Usage: ./dev codex [--fresh] [codex-options]
 
 Launch Codex from the repository root with one-session MCP configuration that
 points directly at this checkout. Nothing is installed from a marketplace and
-no user Codex configuration is changed. Inside Codex, run $voice-code. Use
+no user Codex configuration is changed. Inside Codex, run $start-talking. Use
 --fresh to clear the development configuration and onboarding marker while
 keeping the private venv.
 EOF

@@ -1,5 +1,5 @@
 ---
-description: Start an interactive voice conversation using cadence-code
+description: Start talking with Cadence Code
 ---
 
 You are entering an active voice conversation using the
@@ -17,7 +17,7 @@ If the Cadence Code MCP tools are unavailable or the server is still connecting,
 run `cadence-code-mcp-bootstrap --setup` with the Bash tool and wait for it to
 finish. Do not background it or retry it in parallel. On failure, show the
 error and end. On success, ask the user to run `/reload-plugins` and invoke
-`/cadence-code:voice-code` again, then end without attempting an MCP tool call.
+`/cadence-code:start-talking` again, then end without attempting an MCP tool call.
 
 Use two distinct outputs for each completed request:
 
@@ -35,30 +35,32 @@ Use two distinct outputs for each completed request:
    rearrange, restyle, or generate any part of it from the model response.
 
    ```text
-   +-- WELCOME TO CADENCE_CODE -----------------------------------------+
+   +-- WELCOME TO CADENCE CODE ----------------------------------------+
    |
-   | Let's talk through whatever you're working on.
+   | I want to talk with you. Ask me questions, think out loud,
+   | or tell me what to build.
    |
-   | YOU SPEAK -> I WORK -> SHORT REPLY ALOUD + DETAILS ON SCREEN
+   | YOU TALK -> I WORK -> WE KEEP GOING
    |
-   | We alternate turns. After the listening chime, speak naturally.
-   | When I finish, the microphone opens again for your next turn.
+   | We take turns. Speak naturally after the chime. I answer aloud
+   | with the useful details on screen, then listen for your next turn.
    |
-   +-- CONTROLS -------------------------------------------------------+
-   | /cadence-code:voice-code       Start a voice conversation.
-   | /cadence-code:voice-settings   Change the voice or listening model anytime.
-   | /cadence-code:voice-interrupt  After pressing Escape, add new guidance.
-   | Say "stop" or "goodbye" to finish the conversation.
+   +-- QUICK CONTROLS -------------------------------------------------+
+   | /cadence-code:start-talking   Start a Cadence Code conversation.
+   | /cadence-code:jump-in         Press Escape, then redirect me by voice.
+   | /cadence-code:wrap-up         End the conversation and release the models.
+   | /cadence-code:voice-settings  Change the voice or speech model.
+   | You can also say "stop" or "goodbye" at any time.
    |
-   +-- PRESET MODELS --------------------------------------------------+
-   | Voice (TTS)       Pocket TTS 100M
-   | Listening (STT)   Parakeet 110M
-   | These recommended models load automatically on your first start.
-   | Run /cadence-code:voice-settings anytime to choose another pair.
+   +-- READY TO GO ----------------------------------------------------+
+   | Voice              Pocket TTS 100M
+   | Speech recognition Parakeet 110M
+   | These local defaults load automatically. Change them anytime
+   | with /cadence-code:voice-settings.
    |
-   +-- PRIVACY --------------------------------------------------------+
-   | Speech recognition and synthesis run locally on this Mac.
-   | Your transcript becomes a normal Claude Code instruction.
+   +-- PRIVATE BY DEFAULT ---------------------------------------------+
+   | Listening and speaking stay on this Mac. Your transcript becomes
+   | a normal Claude Code instruction.
    +------------------------------------------------------------------+
    ```
 
@@ -78,11 +80,12 @@ Use two distinct outputs for each completed request:
    Cadence Code and relaunch Claude Code, then end without starting a voice loop.
 3. Once ready, call `voice_speak` with `listen_after: true`, then call
    `voice_listen` immediately. If `first_run` was true, use this short
-   introduction verbatim: "Welcome to Cadence Code. We can talk through whatever
-   you're working on: after the chime, speak naturally, and I'll reply aloud
-   while keeping the useful details on screen. If you want to redirect me,
-   press Escape and choose Voice Interrupt; I'm listening, so what would you
-   like to work on?" Otherwise use an ordinary casual one-sentence greeting.
+   introduction verbatim: "Welcome to Cadence Code. I want to talk with you
+   about whatever you're working on. We'll alternate turns: speak naturally
+   after the chime, and I'll answer aloud while keeping the useful details on
+   screen. If you want to interrupt me, press Escape and choose Jump In. What
+   would you like to work on?" Otherwise use an ordinary casual one-sentence
+   greeting.
    Cadence Code opens the mic as soon as playback finishes and the listen call
    collects that queued capture. Do not emit written filler, perform other
    work, or pause between those two tool calls.
@@ -118,8 +121,8 @@ Use two distinct outputs for each completed request:
 11. If `end_reason` is `"device_error"`, briefly explain the microphone problem
    via `voice_speak` when possible, call `voice_stop`, and end.
 12. If the transcript clearly means "stop", "that's all", "goodbye", or similar,
-   speak a short goodbye with `listen_after` false, call `voice_stop`, and do
-   not listen again.
+   speak a short goodbye with `listen_after` false, call `voice_stop` with
+   `wait_for_speech: true`, and do not listen again.
 13. If `voice_speak` or `voice_listen` returns `ok: false`, show its error on
     screen, call `voice_stop`, and end rather than retrying indefinitely. In
     particular, `error_code: "session_not_started"` means the required
@@ -134,6 +137,7 @@ walkthrough, use a little more detail while keeping it natural. Once
 turns.
 
 If the user presses Escape during a turn, they can invoke
-`/cadence-code:voice-interrupt` to silence current Cadence Code audio and add
+`/cadence-code:jump-in` to silence current Cadence Code audio and add
 spoken guidance without unloading the models. That separate command owns the
-interrupt recovery workflow.
+interrupt recovery workflow. The user can invoke `/cadence-code:wrap-up` to end
+the conversation directly.

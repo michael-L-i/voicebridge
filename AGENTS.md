@@ -12,8 +12,9 @@ models run through `mlx-audio`; some TTS implementations reuse `mlx-lm` cache
 and sampling utilities internally, but Cadence Code never loads a local
 reasoning or summarization model.
 
-There is no passive narration. Users explicitly start Voice Code with
-`$voice-code` or `/skills` in Codex, or `/cadence-code:voice-code` in Claude Code:
+There is no passive narration. Users explicitly choose Start Talking with
+`$start-talking` or `/skills` in Codex, or `/cadence-code:start-talking` in
+Claude Code:
 
 - On a new install, the host calls `voice_models`, shows the fixed first-run
   orientation, and persists its returned Pocket TTS and Parakeet 110M defaults
@@ -32,6 +33,8 @@ There is no passive narration. Users explicitly start Voice Code with
 - At that point the host calls `voice_stop`, which drops both providers, clears
   the MLX cache, and releases the active-session lock. If the host session ends
   unexpectedly, MCP process exit releases its memory and lock.
+- The explicit `$wrap-up` or `/cadence-code:wrap-up` workflow gives the same
+  clean ending on demand, allowing a short goodbye to finish before release.
 
 The MCP process itself is lightweight until voice mode starts. Models remain
 warm between turns, then are released when the conversation stops.
@@ -52,8 +55,8 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   prevents Claude Code from also discovering it as a project MCP server during
   direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
-- `skills/voice-code/`, `skills/voice-settings/`, and
-  `skills/voice-interrupt/`: canonical Codex workflows.
+- `skills/start-talking/`, `skills/jump-in/`, `skills/wrap-up/`, and
+  `skills/voice-settings/`: canonical Codex workflows.
 - `.agents/skills/`: relative symlinks to every canonical Codex skill so direct
   checkouts expose the same workflows as installed plugins.
 - `bin/cadence-code-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
@@ -63,8 +66,9 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
-- `commands/voice-code.md` and `commands/voice-interrupt.md`: the corresponding
-  Claude Code slash commands, namespaced to the plugin automatically.
+- `commands/start-talking.md`, `commands/jump-in.md`, and
+  `commands/wrap-up.md`: the corresponding Claude Code slash commands,
+  namespaced to the plugin automatically.
 
 ## Important Paths
 
@@ -121,10 +125,10 @@ sequence through a real Codex or Claude Code MCP client session.
 
 When the user asks to launch a Cadence Code test instance, use `cmux` to create
 and drive a visible, clearly named tab/surface in the user's current workspace.
-Do not create a separate native cmux window unless the user asks for one. Start
-Voice Code on the user's behalf and leave the session open for hands-on audio
-testing; do not ask the user to type routine launch, install, or initialization
-commands.
+Do not create a separate native cmux window unless the user asks for one. Invoke
+Start Talking on the user's behalf and leave the session open for hands-on
+audio testing; do not ask the user to type routine launch, install, or
+initialization commands.
 
 Support both Claude Code and Codex as first-class test hosts. If the user does
 not name a host, default to Claude Code. If the user names Codex, launch and
@@ -132,14 +136,14 @@ initialize a Codex test tab instead; do not substitute Claude Code merely
 because its direct-checkout workflow is simpler.
 
 - For a local Claude Code branch test, run `./dev claude`, then send
-  `/cadence-code:voice-code`. This tests the checkout directly through
+  `/cadence-code:start-talking`. This tests the checkout directly through
   `--plugin-dir` instead of the installed plugin cache.
-- For a local Codex branch test, run `./dev codex`, then send `$voice-code`.
+- For a local Codex branch test, run `./dev codex`, then send `$start-talking`.
   The launcher injects the checkout's MCP server for that process only and does
   not install a plugin or configure a marketplace.
 - For a GitHub release test, update/install the normal GitHub-backed plugin,
   verify the requested version and source, launch the host without a local
-  plugin override, and start Voice Code.
+  plugin override, and invoke Start Talking.
 - Name the cmux tab with the host, source (`local` or `release`), branch or
   version, and use `cmux read-screen` to verify startup.
 - Fully stop or close an existing Cadence Code test before launching another;

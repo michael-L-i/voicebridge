@@ -66,7 +66,7 @@ plugin or marketplace, run:
 ./dev claude
 ```
 
-Then invoke `/cadence-code:voice-code`. Claude Code loads the checkout directly
+Then invoke `/cadence-code:start-talking`. Claude Code loads the checkout directly
 with `--plugin-dir`, while Cadence Code keeps its development environment and
 configuration under `.cadence-code-dev/claude/`.
 
@@ -81,8 +81,9 @@ marketplace:
 ./dev codex
 ```
 
-Then invoke `$voice-code` to start a conversation, `$voice-settings` to choose
-models, or `$voice-interrupt` after stopping an active turn. The launcher
+Then invoke `$start-talking` to start a conversation, `$voice-settings` to choose
+models, `$jump-in` after stopping an active turn, or `$wrap-up` to end the
+conversation. The launcher
 supplies the local MCP server through one-session Codex overrides, and the
 repository exposes all canonical skills through `.agents/skills/`. No
 user-level Codex configuration is changed.

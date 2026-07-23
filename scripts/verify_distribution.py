@@ -49,7 +49,7 @@ def verify_wheel(wheel: Path, name: str, version: str, requires_python: str) -> 
 
 
 def verify_sdist(sdist: Path, name: str, version: str) -> None:
-    expected_root = f"{name}-{version}/"
+    expected_root = f"{name.replace('-', '_')}-{version}/"
     required_files = {
         "pyproject.toml",
         "README.md",

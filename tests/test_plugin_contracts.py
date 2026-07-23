@@ -54,10 +54,12 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(entry["policy"]["authentication"], "ON_INSTALL")
         self.assertEqual(entry["category"], "Productivity")
 
-    def test_codex_skill_is_explicit_and_references_exact_tool_surface(self):
-        skill = (ROOT / "skills/voice-code/SKILL.md").read_text(encoding="utf-8")
-        command = (ROOT / "commands/voice-code.md").read_text(encoding="utf-8")
-        metadata = (ROOT / "skills/voice-code/agents/openai.yaml").read_text(
+    def test_start_talking_is_explicit_and_references_exact_tool_surface(self):
+        skill = (ROOT / "skills/start-talking/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        command = (ROOT / "commands/start-talking.md").read_text(encoding="utf-8")
+        metadata = (ROOT / "skills/start-talking/agents/openai.yaml").read_text(
             encoding="utf-8"
         )
         expected_tools = {
@@ -70,7 +72,7 @@ class PluginContractTests(unittest.TestCase):
         }
 
         self.assertIn("allow_implicit_invocation: false", metadata)
-        self.assertIn("explicitly invokes $voice-code", skill)
+        self.assertIn("explicitly invokes $start-talking", skill)
         self.assertIn("If `first_run` is true", skill)
         self.assertIn("before any", skill)
         self.assertIn("model download", skill)
@@ -84,39 +86,43 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn('error_code: "session_not_started"', command)
 
     def test_first_run_onboarding_covers_text_voice_and_host_controls(self):
-        codex = (ROOT / "skills/voice-code/SKILL.md").read_text(encoding="utf-8")
-        claude = (ROOT / "commands/voice-code.md").read_text(encoding="utf-8")
+        codex = (ROOT / "skills/start-talking/SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        claude = (ROOT / "commands/start-talking.md").read_text(encoding="utf-8")
 
         for workflow in (codex, claude):
             normalized = " ".join(workflow.split())
             self.assertIn("reproduce this fixed onboarding script verbatim", normalized)
-            self.assertIn("WELCOME TO CADENCE_CODE", normalized)
-            self.assertIn("YOU SPEAK -> I WORK", normalized)
-            self.assertIn("We alternate turns", normalized)
-            self.assertIn("the microphone opens again", normalized)
-            self.assertIn("PRESET MODELS", normalized)
+            self.assertIn("WELCOME TO CADENCE CODE", normalized)
+            self.assertIn("I want to talk with you", normalized)
+            self.assertIn("YOU TALK -> I WORK -> WE KEEP GOING", normalized)
+            self.assertIn("We take turns", normalized)
+            self.assertIn("listen for your next turn", normalized)
+            self.assertIn("QUICK CONTROLS", normalized)
+            self.assertIn("READY TO GO", normalized)
             self.assertIn("Pocket TTS 100M", normalized)
             self.assertIn("Parakeet 110M", normalized)
-            self.assertIn("PRIVACY", normalized)
-            self.assertIn("run locally on this Mac", normalized)
+            self.assertIn("PRIVATE BY DEFAULT", normalized)
+            self.assertIn("stay on this Mac", normalized)
             self.assertIn("skip the fixed script", normalized)
-            self.assertIn("load automatically on your first start", normalized)
+            self.assertIn("local defaults load automatically", normalized)
             self.assertIn("defaults.tts", normalized)
             self.assertIn("defaults.stt", normalized)
             self.assertIn("Do not present a model selector", normalized)
             self.assertIn("or wait for confirmation", normalized)
-            self.assertIn(
-                "Welcome to Cadence Code. We can talk through whatever", normalized
-            )
+            self.assertIn("Welcome to Cadence Code. I want to talk with you", normalized)
+            self.assertIn("We'll alternate turns", normalized)
             self.assertIn("press Escape", normalized)
-            self.assertIn("choose Voice Interrupt", normalized)
+            self.assertIn("choose Jump In", normalized)
 
-        for command in ("$voice-code", "$voice-settings", "$voice-interrupt"):
+        for command in ("$start-talking", "$jump-in", "$wrap-up", "$voice-settings"):
             self.assertIn(command, codex)
         for command in (
-            "/cadence-code:voice-code",
+            "/cadence-code:start-talking",
+            "/cadence-code:jump-in",
+            "/cadence-code:wrap-up",
             "/cadence-code:voice-settings",
-            "/cadence-code:voice-interrupt",
         ):
             self.assertIn(command, claude)
 
@@ -175,24 +181,39 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("Only call audio tools after the user explicitly", source)
         self.assertIn("never starts a session or loads models implicitly", source)
 
-    def test_interrupt_is_available_from_both_host_uis(self):
-        skill = (ROOT / "skills/voice-interrupt/SKILL.md").read_text(
+    def test_jump_in_is_available_from_both_host_uis(self):
+        skill = (ROOT / "skills/jump-in/SKILL.md").read_text(
             encoding="utf-8"
         )
-        command = (ROOT / "commands/voice-interrupt.md").read_text(
-            encoding="utf-8"
-        )
-        metadata = (ROOT / "skills/voice-interrupt/agents/openai.yaml").read_text(
+        command = (ROOT / "commands/jump-in.md").read_text(encoding="utf-8")
+        metadata = (ROOT / "skills/jump-in/agents/openai.yaml").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("explicitly invokes $voice-interrupt", skill)
+        self.assertIn("explicitly invokes $jump-in", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
         self.assertIn("mcp__cadence-code__voice_interrupt", skill)
         self.assertIn("mcp__cadence-code__voice_interrupt", command)
         self.assertIn("added guidance", skill)
         self.assertIn("added guidance", command)
         self.assertIn("Escape", command)
+
+    def test_wrap_up_is_explicit_and_finishes_final_speech(self):
+        skill = (ROOT / "skills/wrap-up/SKILL.md").read_text(encoding="utf-8")
+        command = (ROOT / "commands/wrap-up.md").read_text(encoding="utf-8")
+        metadata = (ROOT / "skills/wrap-up/agents/openai.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("explicitly invokes $wrap-up", skill)
+        self.assertIn("allow_implicit_invocation: false", metadata)
+        for workflow in (skill, command):
+            self.assertIn("mcp__cadence-code__voice_status", workflow)
+            self.assertIn("mcp__cadence-code__voice_speak", workflow)
+            self.assertIn("mcp__cadence-code__voice_stop", workflow)
+            self.assertIn("wait_for_speech: true", workflow)
+            self.assertIn("exactly once", workflow)
+            self.assertIn("Do not listen again", workflow)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
         bootstrap = ROOT / "bin/cadence-code-mcp-bootstrap"

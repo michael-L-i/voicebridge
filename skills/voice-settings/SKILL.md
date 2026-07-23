@@ -11,7 +11,7 @@ change the saved speech-model pair. This workflow is configuration only: do not
 start a voice conversation or use the microphone.
 
 1. Call `mcp__cadence-code__voice_status`.
-2. If `ready` is true, explain that a model change ends the current Voice Code
+2. If `ready` is true, explain that a model change ends the current Cadence Code
    session. Ask for confirmation with Codex's structured question UI. If the
    user confirms, call `mcp__cadence-code__voice_stop`; otherwise end without
    changing settings.
@@ -26,7 +26,7 @@ start a voice conversation or use the microphone.
 4. If the user cancels either selector, end without changing settings.
    Otherwise call `mcp__cadence-code__voice_configure` with both chosen IDs.
 5. Confirm the selected labels and say the models download when the next
-   `$voice-code` session starts. Do not call `mcp__cadence-code__voice_start`,
+   `$start-talking` conversation starts. Do not call `mcp__cadence-code__voice_start`,
    `mcp__cadence-code__voice_speak`, or `mcp__cadence-code__voice_listen` here.
    Explain that unused model weights remain in the Hugging Face cache until the
    user removes them.

@@ -1,12 +1,12 @@
-# cadence-code
+# Cadence Code
 
 [![CI](https://github.com/michael-L-i/cadence-code/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-L-i/cadence-code/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11-3.14](https://img.shields.io/badge/Python-3.11--3.14-blue.svg)](https://www.python.org/)
 
-A local voice interface for Codex and Claude Code on Apple Silicon. Start Voice
-Code, talk naturally, and let your coding agent decide what to say back — no
-daemon, no cloud, no second language model in the loop. See
+A local voice interface for Codex and Claude Code on Apple Silicon. Start
+Talking, speak naturally, and let your coding agent decide what to say back —
+no daemon, no cloud, no second language model in the loop. See
 [Cadence Code privacy](PRIVACY.md) for the exact local-processing and host
 handoff boundary.
 
@@ -28,7 +28,7 @@ handoff boundary.
 /plugin install cadence-code@cadence-code-marketplace
 ```
 
-Restart Claude Code, then run `/cadence-code:voice-code`.
+Restart Claude Code, then run `/cadence-code:start-talking`.
 
 **Codex** (CLI and desktop app; the IDE extension doesn't support plugins yet)
 
@@ -37,7 +37,7 @@ codex plugin marketplace add michael-L-i/cadence-code
 codex plugin add cadence-code@cadence-code-marketplace
 ```
 
-Start a new Codex session, then run `$voice-code` (or pick Voice Code from
+Start a new Codex session, then run `$start-talking` (or pick Start Talking from
 `/skills`).
 
 On first run Cadence Code shows a quick orientation, starts with Pocket TTS and
@@ -45,7 +45,12 @@ Parakeet 110M, requests microphone access, and downloads both models
 automatically. Change either model anytime with `/cadence-code:voice-settings`
 (Claude Code) or `$voice-settings` (Codex).
 
-If Claude Code's voice tools are still connecting on first use, Voice Code
+During a conversation, press Escape and use `/cadence-code:jump-in` or
+`$jump-in` to redirect by voice. Use `/cadence-code:wrap-up` or `$wrap-up` to
+end cleanly and release the local speech models. Saying "stop" or "goodbye"
+does the same thing.
+
+If Claude Code's voice tools are still connecting on first use, Start Talking
 finishes the one-time dependency setup and asks you to run `/reload-plugins`
 before invoking it again.
 
@@ -107,7 +112,7 @@ hf cache delete --sort size
   `[audio]` device settings, then restart the host.
 - **Setup or model download fails:** confirm the supported Python version,
   internet access, and free disk space, then restart the host to retry.
-- **Session already in use:** stop Voice Code in every Codex, Claude Code, and
+- **Session already in use:** stop Cadence Code in every Codex, Claude Code, and
   dev session — only one process can own the audio session at a time.
 - **An update still reports the old version:** fully exit every host process
   that loaded Cadence Code and start a new one.

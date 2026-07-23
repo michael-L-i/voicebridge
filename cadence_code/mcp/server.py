@@ -122,10 +122,14 @@ def voice_interrupt(
 
 
 @mcp.tool()
-def voice_stop() -> dict:
-    """End voice mode and release its local TTS and STT model memory."""
+def voice_stop(wait_for_speech: bool = False) -> dict:
+    """End voice mode and release its local TTS and STT model memory.
+
+    Set wait_for_speech after starting a short final voice_speak with
+    listen_after false. The goodbye is allowed to finish before the models are
+    released. Leave it false when stopping should silence audio immediately."""
     try:
-        return {"ok": True, **runtime.stop()}
+        return {"ok": True, **runtime.stop(wait_for_speech=wait_for_speech)}
     except Exception as exc:
         return _error(exc)
 

@@ -343,6 +343,40 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertTrue(heard["capture_queued"])
         self.assertEqual(transcribe_threads, [threading.current_thread().name])
 
+    def test_stop_can_wait_for_a_final_goodbye(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+        playback = Mock()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
+                patch(
+                    "cadence_code.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    playback_module,
+                    "play_async",
+                    return_value=playback,
+                ),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
+                runtime.speak("Talk again soon.", listen_after=False)
+
+                stopped = runtime.stop(wait_for_speech=True)
+
+        playback.wait.assert_called_once_with(
+            timeout=runtime_module._FINAL_SPEECH_WAIT_S
+        )
+        playback.cancel.assert_not_called()
+        self.assertTrue(stopped["stopped"])
+        self.assertFalse(runtime.ready)
+
     def test_interrupt_cancels_queued_audio_and_captures_fresh_guidance(self):
         stt = _FakeSTT()
         registry = _fake_registry(_FakeTTS(), stt)
@@ -464,7 +498,7 @@ class VoiceRuntimeTests(unittest.TestCase):
     def test_interrupt_requires_an_active_session(self):
         runtime = runtime_module.VoiceRuntime(Config())
 
-        with self.assertRaisesRegex(RuntimeError, "start Voice Code first"):
+        with self.assertRaisesRegex(RuntimeError, "start Cadence Code first"):
             runtime.interrupt()
 
     def test_listen_uses_config_timing_unless_overridden(self):

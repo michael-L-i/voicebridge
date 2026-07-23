@@ -20,6 +20,7 @@ from cadence_code.config import (
 SESSION_LOCK_PATH = Path.home() / ".cadence-code" / "active-session.lock"
 _ONBOARDING_MARKER = "onboarding-v1.complete"
 _CANCEL_WAIT_S = 3.0
+_FINAL_SPEECH_WAIT_S = 30.0
 
 
 class VoiceSessionBusy(RuntimeError):
@@ -210,14 +211,17 @@ class VoiceRuntime:
         with self._operation_lock:
             return self._listen_locked(timeout_ms, silence_ms)
 
-    def stop(self) -> dict:
+    def stop(self, *, wait_for_speech: bool = False) -> dict:
         stopped = self.ready or self._session_lock_file is not None
         with self._queued_listen_lock:
             queued_listen = self._queued_listen
             self._queued_listen = None
         if queued_listen is not None:
             queued_listen.cancel()
-        self._cancel_active_audio()
+        if wait_for_speech:
+            self._cancel_active_capture()
+        else:
+            self._cancel_active_audio()
         if queued_listen is not None:
             try:
                 queued_listen.wait(timeout=_CANCEL_WAIT_S)
@@ -231,8 +235,18 @@ class VoiceRuntime:
         with self._operation_lock:
             release_session = True
             try:
-                self._cancel_active_audio()
-                self._wait_for_playback(timeout=_CANCEL_WAIT_S)
+                if wait_for_speech:
+                    try:
+                        self._wait_for_playback(timeout=_FINAL_SPEECH_WAIT_S)
+                    except TimeoutError:
+                        self._cancel_active_audio()
+                        self._wait_for_playback(timeout=_CANCEL_WAIT_S)
+                        raise RuntimeError(
+                            "final speech did not finish during voice_stop"
+                        )
+                else:
+                    self._cancel_active_audio()
+                    self._wait_for_playback(timeout=_CANCEL_WAIT_S)
             except TimeoutError:
                 release_session = False
                 raise
@@ -249,8 +263,8 @@ class VoiceRuntime:
         """Cancel current audio and capture fresh guidance for this session."""
         if not self.ready:
             raise RuntimeError(
-                "voice_interrupt requires an active Voice Code session; "
-                "start Voice Code first"
+                "voice_interrupt requires an active Cadence Code session; "
+                "start Cadence Code first"
             )
 
         with self._queued_listen_lock:
@@ -264,7 +278,7 @@ class VoiceRuntime:
 
         with self._operation_lock:
             if not self.ready:
-                raise RuntimeError("the Voice Code session stopped during interruption")
+                raise RuntimeError("the Cadence Code session stopped during interruption")
             self._cancel_active_audio()
             self._wait_for_playback(timeout=_CANCEL_WAIT_S)
             return {
@@ -373,6 +387,12 @@ class VoiceRuntime:
             capture_cancel.set()
         if playback is not None:
             playback.cancel()
+
+    def _cancel_active_capture(self) -> None:
+        with self._activity_lock:
+            capture_cancel = self._capture_cancel
+        if capture_cancel is not None:
+            capture_cancel.set()
 
     def _begin_capture(
         self, cancel_event: threading.Event | None = None

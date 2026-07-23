@@ -70,17 +70,20 @@ def main() -> int:
 
     required_paths = [
         "bin/cadence-code-mcp-bootstrap",
-        "commands/voice-code.md",
-        "commands/voice-interrupt.md",
+        "commands/jump-in.md",
+        "commands/start-talking.md",
         "commands/voice-settings.md",
+        "commands/wrap-up.md",
         "config/default_config.toml",
         "requirements.lock",
-        "skills/voice-code/SKILL.md",
-        "skills/voice-code/agents/openai.yaml",
-        "skills/voice-interrupt/SKILL.md",
-        "skills/voice-interrupt/agents/openai.yaml",
+        "skills/jump-in/SKILL.md",
+        "skills/jump-in/agents/openai.yaml",
+        "skills/start-talking/SKILL.md",
+        "skills/start-talking/agents/openai.yaml",
         "skills/voice-settings/SKILL.md",
         "skills/voice-settings/agents/openai.yaml",
+        "skills/wrap-up/SKILL.md",
+        "skills/wrap-up/agents/openai.yaml",
     ]
     for relative_path in required_paths:
         if not (ROOT / relative_path).is_file():
