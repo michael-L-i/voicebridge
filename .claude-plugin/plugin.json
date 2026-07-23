@@ -1,6 +1,6 @@
 {
   "name": "voicebridge",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Configurable local speech and transcription for natural Claude Code conversations on Apple Silicon.",
   "author": {
     "name": "Michael Li"
