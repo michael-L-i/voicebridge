@@ -1,6 +1,6 @@
-# Releasing VoiceBridge
+# Releasing Cadence Code
 
-VoiceBridge releases are source releases for the Codex and Claude Code
+Cadence Code releases are source releases for the Codex and Claude Code
 marketplaces. The repository does not publish to PyPI, Homebrew, or any other
 package registry. The default-branch marketplace snapshots are the distribution
 channel: merging a bumped manifest version to `main` makes that source available
@@ -49,9 +49,9 @@ or SHA; do not use a local checkout override.
 
 For each fresh test:
 
-- Use clean VoiceBridge plugin data, confirm first-run setup appears, and accept
+- Use clean Cadence Code plugin data, confirm first-run setup appears, and accept
   the default Pocket TTS 100M and Parakeet 110M choices.
-- Open VoiceBridge Settings, confirm the saved choices, make and persist a
+- Open Cadence Code Settings, confirm the saved choices, make and persist a
   temporary model change, then restore the intended defaults.
 
 For each upgrade test:
@@ -67,8 +67,8 @@ For every path:
   source commit and manifest version.
 - Confirm `voice_status` reports the new version and the correct host
   (`codex` or `claude-code`) after the required host restart.
-- Start Voice Code, speak a response, listen and transcribe a reply, exercise
-  the explicit interrupt flow, then stop and confirm the session releases.
+- Invoke Start Talking, speak a response, listen and transcribe a reply,
+  exercise Jump In, then use Wrap Up and confirm the session releases.
 - Start a second new host process and repeat the status/start/stop smoke test to
   catch stale MCP processes and restart-only failures.
 
@@ -95,10 +95,10 @@ For every path:
 6. Confirm that post-publish workflow is green before announcing the release or
    directing users to update their marketplace installation.
 
-VoiceBridge deliberately uses the generic GitHub tag `vX.Y.Z` because one
+Cadence Code deliberately uses the generic GitHub tag `vX.Y.Z` because one
 repository release serves both Codex and Claude Code. Current Claude Code's
 `claude plugin tag` command instead proposes the plugin-specific
-`voicebridge--vX.Y.Z` convention. That Claude-specific tag is not required for
+`cadence-code--vX.Y.Z` convention. That Claude-specific tag is not required for
 default-branch marketplace refreshes and must not replace the generic tag on a
 GitHub Release; the existing release verification intentionally continues to
 require `vX.Y.Z`.

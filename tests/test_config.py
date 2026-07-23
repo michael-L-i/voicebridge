@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from voicebridge import config as config_module
+from cadence_code import config as config_module
 
 
 class ConfigMigrationTests(unittest.TestCase):

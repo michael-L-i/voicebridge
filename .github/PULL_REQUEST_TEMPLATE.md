@@ -8,7 +8,7 @@
 
 ## Checklist
 
-- [ ] I kept this change within VoiceBridge's local-first product scope.
+- [ ] I kept this change within Cadence Code's local-first product scope.
 - [ ] I added or updated tests for behavior changes.
 - [ ] I updated documentation for user-facing changes.
 - [ ] `uv lock --check` passes locally.

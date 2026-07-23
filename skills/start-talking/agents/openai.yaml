@@ -1,0 +1,7 @@
+interface:
+  display_name: "Start Talking"
+  short_description: "Start a local voice conversation with Codex"
+  default_prompt: "Use $start-talking to start a local voice conversation."
+
+policy:
+  allow_implicit_invocation: false

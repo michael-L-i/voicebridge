@@ -1,0 +1,26 @@
+import numpy as np
+from mlx_audio.stt.utils import load_model
+
+from cadence_code.config import STTConfig
+from cadence_code.providers.base import STTProvider
+from cadence_code.providers.output import model_output_to_stderr
+
+
+class MoonshineSTTProvider(STTProvider):
+    sample_rate = 16000
+
+    def __init__(self, config: STTConfig):
+        self.config = config
+        self._model = None
+
+    def load(self) -> "MoonshineSTTProvider":
+        if self._model is None:
+            with model_output_to_stderr():
+                self._model = load_model(self.config.model)
+        return self
+
+    def transcribe(self, audio: np.ndarray) -> str:
+        self.load()
+        with model_output_to_stderr():
+            result = self._model.generate(audio.astype(np.float32))
+        return result.text.strip()

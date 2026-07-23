@@ -83,23 +83,23 @@ jobs:
 
       - name: Bootstrap an empty production environment
         env:
-          VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}/voicebridge-bootstrap
-          VOICEBRIDGE_PYTHON: python
-        run: ./bin/voicebridge-mcp-bootstrap </dev/null
+          CADENCE_CODE_DATA_DIR: ${{ runner.temp }}/cadence-code-bootstrap
+          CADENCE_CODE_PYTHON: python
+        run: ./bin/cadence-code-mcp-bootstrap </dev/null
 
       - name: Verify the bootstrapped Kokoro English frontend
         run: |
-          $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -m unittest \
+          $RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python -m unittest \
             discover -s tests -p test_kokoro_frontend.py -v
 
       - name: Verify the native MLX runtime
-        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -c 'import mlx.core as mx; print(mx.default_device())'
+        run: $RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python -c 'import mlx.core as mx; print(mx.default_device())'
 
       - name: Validate plugin contracts
-        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python scripts/validate_plugin.py
+        run: $RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python scripts/validate_plugin.py
 
       - name: Run unit tests
-        run: $RUNNER_TEMP/voicebridge-bootstrap/venv/bin/python -m unittest discover -s tests -v
+        run: $RUNNER_TEMP/cadence-code-bootstrap/venv/bin/python -m unittest discover -s tests -v
 
   package:
     name: Package artifacts

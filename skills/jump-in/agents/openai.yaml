@@ -1,0 +1,7 @@
+interface:
+  display_name: "Jump In"
+  short_description: "Interrupt and add spoken guidance"
+  default_prompt: "Use $jump-in to stop current audio and add spoken guidance."
+
+policy:
+  allow_implicit_invocation: false

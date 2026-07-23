@@ -1,6 +1,6 @@
-# Contributing to VoiceBridge
+# Contributing to Cadence Code
 
-Thanks for helping improve VoiceBridge. Bug reports, focused fixes,
+Thanks for helping improve Cadence Code. Bug reports, focused fixes,
 documentation improvements, and carefully scoped features are welcome.
 
 By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -16,7 +16,7 @@ project's [MIT License](LICENSE).
 - Never include credentials, private transcripts, recordings, model caches, or
   other sensitive data in an issue or pull request.
 
-VoiceBridge is deliberately local and narrowly scoped. Contributions should
+Cadence Code is deliberately local and narrowly scoped. Contributions should
 preserve the boundaries described in the README: no cloud services, telemetry,
 detached daemon, passive narration, or second language model unless the project
 direction is explicitly changed first.
@@ -30,7 +30,7 @@ Development requires an Apple Silicon Mac running macOS 14 or newer and Python
 uv sync --locked --python 3.13
 ./dev check
 uv run --locked python scripts/validate_plugin.py
-uv run --locked voicebridge doctor
+uv run --locked cadence-code doctor
 ```
 
 The first real voice session can download several speech-model files. Unit
@@ -55,7 +55,7 @@ To inspect the checkout's MCP tools without installing either host plugin, run:
 ./dev inspector
 ```
 
-This uses an isolated `.voicebridge-dev/` data directory. Opening the Inspector
+This uses an isolated `.cadence-code-dev/` data directory. Opening the Inspector
 can install the Python dependencies, but model weights are not downloaded until
 you call `voice_start`.
 
@@ -66,9 +66,9 @@ plugin or marketplace, run:
 ./dev claude
 ```
 
-Then invoke `/voicebridge:voice-code`. Claude Code loads the checkout directly
-with `--plugin-dir`, while VoiceBridge keeps its development environment and
-configuration under `.voicebridge-dev/claude/`.
+Then invoke `/cadence-code:start-talking`. Claude Code loads the checkout directly
+with `--plugin-dir`, while Cadence Code keeps its development environment and
+configuration under `.cadence-code-dev/claude/`.
 
 Use `./dev claude --fresh` to exercise first-run model selection again. It
 clears only the development configuration and onboarding marker, retaining the
@@ -81,8 +81,9 @@ marketplace:
 ./dev codex
 ```
 
-Then invoke `$voice-code` to start a conversation, `$voice-settings` to choose
-models, or `$voice-interrupt` after stopping an active turn. The launcher
+Then invoke `$start-talking` to start a conversation, `$voice-settings` to choose
+models, `$jump-in` after stopping an active turn, or `$wrap-up` to end the
+conversation. The launcher
 supplies the local MCP server through one-session Codex overrides, and the
 repository exposes all canonical skills through `.agents/skills/`. No
 user-level Codex configuration is changed.
@@ -91,13 +92,13 @@ Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.
 
 When you need to discard every local-development venv and configuration, first
-close Claude Code, Codex, and MCP Inspector sessions using VoiceBridge, then run:
+close Claude Code, Codex, and MCP Inspector sessions using Cadence Code, then run:
 
 ```bash
 ./dev reset
 ```
 
-The command moves only `.voicebridge-dev/` to macOS Trash. It does not touch an
+The command moves only `.cadence-code-dev/` to macOS Trash. It does not touch an
 installed plugin's data or the speech libraries' shared model caches.
 
 ## Making a change
@@ -113,8 +114,8 @@ For changes involving audio devices, model loading, or the MCP lifecycle, also
 run the narrowest relevant manual check on Apple Silicon:
 
 ```bash
-voicebridge doctor
-voicebridge listen-test
+cadence-code doctor
+cadence-code listen-test
 ```
 
 A full voice-mode change should be exercised through

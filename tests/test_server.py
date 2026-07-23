@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from voicebridge.mcp import server
-from voicebridge.mcp.runtime import VoiceSessionNotStarted
+from cadence_code.mcp import server
+from cadence_code.mcp.runtime import VoiceSessionNotStarted
 
 
 class VoiceServerTests(unittest.TestCase):

@@ -4,12 +4,12 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from voicebridge.config import STTConfig, TTSConfig
-from voicebridge.providers.chatterbox_tts import ChatterboxTTSProvider
-from voicebridge.providers.moonshine_stt import MoonshineSTTProvider
-from voicebridge.providers.pocket_tts import PocketTTSProvider
-from voicebridge.providers.qwen_tts import QwenTTSProvider
-from voicebridge.providers.registry import STT_PROVIDERS, TTS_PROVIDERS
+from cadence_code.config import STTConfig, TTSConfig
+from cadence_code.providers.chatterbox_tts import ChatterboxTTSProvider
+from cadence_code.providers.moonshine_stt import MoonshineSTTProvider
+from cadence_code.providers.pocket_tts import PocketTTSProvider
+from cadence_code.providers.qwen_tts import QwenTTSProvider
+from cadence_code.providers.registry import STT_PROVIDERS, TTS_PROVIDERS
 
 
 class QwenTTSProviderTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class QwenTTSProviderTests(unittest.TestCase):
         )
 
         with patch(
-            "voicebridge.providers.qwen_tts.load_model",
+            "cadence_code.providers.qwen_tts.load_model",
             return_value=model,
         ) as load_model:
             provider = QwenTTSProvider(config)
@@ -52,7 +52,7 @@ class QwenTTSProviderTests(unittest.TestCase):
         model.generate.return_value = []
 
         with patch(
-            "voicebridge.providers.qwen_tts.load_model",
+            "cadence_code.providers.qwen_tts.load_model",
             return_value=model,
         ):
             audio = QwenTTSProvider(TTSConfig(voice="Aiden")).synthesize(
@@ -80,7 +80,7 @@ class ChatterboxTTSProviderTests(unittest.TestCase):
         )
 
         with patch(
-            "voicebridge.providers.chatterbox_tts.load_model",
+            "cadence_code.providers.chatterbox_tts.load_model",
             return_value=model,
         ) as load_model:
             provider = ChatterboxTTSProvider(config)
@@ -99,7 +99,7 @@ class ChatterboxTTSProviderTests(unittest.TestCase):
         config = TTSConfig(voice="default")
 
         with patch(
-            "voicebridge.providers.chatterbox_tts.load_model",
+            "cadence_code.providers.chatterbox_tts.load_model",
             return_value=model,
         ):
             audio = ChatterboxTTSProvider(config).synthesize(
@@ -130,7 +130,7 @@ class PocketTTSProviderTests(unittest.TestCase):
         )
 
         with patch(
-            "voicebridge.providers.pocket_tts.load_model",
+            "cadence_code.providers.pocket_tts.load_model",
             return_value=model,
         ) as load_model:
             provider = PocketTTSProvider(config)
@@ -148,7 +148,7 @@ class PocketTTSProviderTests(unittest.TestCase):
         model.generate.return_value = []
 
         with patch(
-            "voicebridge.providers.pocket_tts.load_model",
+            "cadence_code.providers.pocket_tts.load_model",
             return_value=model,
         ):
             audio = PocketTTSProvider(TTSConfig(voice="alba")).synthesize(
@@ -172,7 +172,7 @@ class MoonshineSTTProviderTests(unittest.TestCase):
         )
 
         with patch(
-            "voicebridge.providers.moonshine_stt.load_model",
+            "cadence_code.providers.moonshine_stt.load_model",
             return_value=model,
         ) as load_model:
             provider = MoonshineSTTProvider(config)

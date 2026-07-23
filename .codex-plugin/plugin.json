@@ -1,13 +1,13 @@
 {
-  "name": "voicebridge",
-  "version": "0.5.0",
+  "name": "cadence-code",
+  "version": "0.6.0",
   "description": "Fully local voice conversations for Codex and Claude Code on Apple Silicon.",
   "author": {
     "name": "Michael Li",
     "url": "https://github.com/michael-L-i"
   },
-  "homepage": "https://github.com/michael-L-i/voicebridge",
-  "repository": "https://github.com/michael-L-i/voicebridge",
+  "homepage": "https://github.com/michael-L-i/cadence-code",
+  "repository": "https://github.com/michael-L-i/cadence-code",
   "license": "MIT",
   "keywords": [
     "apple-silicon",
@@ -19,15 +19,15 @@
   ],
   "skills": "./skills/",
   "mcpServers": {
-    "voicebridge": {
+    "cadence-code": {
       "type": "stdio",
       "command": "bash",
       "args": [
-        "./bin/voicebridge-mcp-bootstrap"
+        "./bin/cadence-code-mcp-bootstrap"
       ],
       "cwd": ".",
       "env": {
-        "VOICEBRIDGE_HOST": "codex"
+        "CADENCE_CODE_HOST": "codex"
       },
       "startup_timeout_sec": 900,
       "tool_timeout_sec": 1800,
@@ -35,7 +35,7 @@
     }
   },
   "interface": {
-    "displayName": "VoiceBridge",
+    "displayName": "Cadence Code",
     "shortDescription": "Local voice conversations for Codex",
     "longDescription": "Talk naturally with Codex using selectable local speech and transcription models on Apple Silicon.",
     "developerName": "Michael Li",
@@ -43,11 +43,11 @@
     "capabilities": [
       "Interactive"
     ],
-    "websiteURL": "https://github.com/michael-L-i/voicebridge",
-    "privacyPolicyURL": "https://github.com/michael-L-i/voicebridge/blob/main/PRIVACY.md",
+    "websiteURL": "https://github.com/michael-L-i/cadence-code",
+    "privacyPolicyURL": "https://github.com/michael-L-i/cadence-code/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Start a local voice coding conversation.",
-      "Choose VoiceBridge speech and transcription models."
+      "Choose Cadence Code speech and transcription models."
     ]
   }
 }

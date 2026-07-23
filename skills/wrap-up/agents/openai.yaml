@@ -1,0 +1,7 @@
+interface:
+  display_name: "Wrap Up"
+  short_description: "End the conversation and release speech models"
+  default_prompt: "Use $wrap-up to end the active Cadence Code conversation."
+
+policy:
+  allow_implicit_invocation: false

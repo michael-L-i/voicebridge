@@ -15,11 +15,11 @@ try:
 except ImportError:
     sys.modules["webrtcvad"] = SimpleNamespace(Vad=lambda *args: None)
 
-from voicebridge.audio import capture as capture_module
-from voicebridge.audio import playback as playback_module
-from voicebridge import config as config_module
-from voicebridge.config import Config
-from voicebridge.mcp import runtime as runtime_module
+from cadence_code.audio import capture as capture_module
+from cadence_code.audio import playback as playback_module
+from cadence_code import config as config_module
+from cadence_code.config import Config
+from cadence_code.mcp import runtime as runtime_module
 
 
 class _FakeTTS:
@@ -58,7 +58,7 @@ class _FailingSTT(_FakeSTT):
 
 
 def _fake_registry(tts, stt):
-    module = ModuleType("voicebridge.providers.registry")
+    module = ModuleType("cadence_code.providers.registry")
     module.get_tts_provider = Mock(return_value=tts)
     module.get_stt_provider = Mock(return_value=stt)
     return module
@@ -143,9 +143,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
             ):
@@ -166,9 +166,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ) as preflight,
                 patch.object(playback_module, "play_async") as play_async,
@@ -199,9 +199,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ) as preflight,
                 patch.object(capture_module, "listen") as listen,
@@ -233,10 +233,10 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(os.environ, {"VOICEBRIDGE_HOST": "codex"}),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(os.environ, {"CADENCE_CODE_HOST": "codex"}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ) as preflight,
                 patch.object(playback_module, "play_async") as play_async,
@@ -313,9 +313,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(
@@ -342,6 +342,40 @@ class VoiceRuntimeTests(unittest.TestCase):
         self.assertEqual(heard["transcript"], "heard")
         self.assertTrue(heard["capture_queued"])
         self.assertEqual(transcribe_threads, [threading.current_thread().name])
+
+    def test_stop_can_wait_for_a_final_goodbye(self):
+        registry = _fake_registry(_FakeTTS(), _FakeSTT())
+        playback = Mock()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(
+                    runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
+                ),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
+                patch(
+                    "cadence_code.audio.preflight.run_preflight",
+                    return_value=_preflight_result(),
+                ),
+                patch.object(
+                    playback_module,
+                    "play_async",
+                    return_value=playback,
+                ),
+            ):
+                runtime = runtime_module.VoiceRuntime(Config(), data_dir=root / "data")
+                runtime.start()
+                runtime.speak("Talk again soon.", listen_after=False)
+
+                stopped = runtime.stop(wait_for_speech=True)
+
+        playback.wait.assert_called_once_with(
+            timeout=runtime_module._FINAL_SPEECH_WAIT_S
+        )
+        playback.cancel.assert_not_called()
+        self.assertTrue(stopped["stopped"])
+        self.assertFalse(runtime.ready)
 
     def test_interrupt_cancels_queued_audio_and_captures_fresh_guidance(self):
         stt = _FakeSTT()
@@ -381,9 +415,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(
@@ -433,9 +467,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(capture_module, "listen", side_effect=capture_listen),
@@ -464,7 +498,7 @@ class VoiceRuntimeTests(unittest.TestCase):
     def test_interrupt_requires_an_active_session(self):
         runtime = runtime_module.VoiceRuntime(Config())
 
-        with self.assertRaisesRegex(RuntimeError, "start Voice Code first"):
+        with self.assertRaisesRegex(RuntimeError, "start Cadence Code first"):
             runtime.interrupt()
 
     def test_listen_uses_config_timing_unless_overridden(self):
@@ -485,9 +519,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(
@@ -531,9 +565,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(
@@ -583,9 +617,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
                 patch.object(
@@ -616,17 +650,17 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
             ):
-                with patch.dict(os.environ, {"VOICEBRIDGE_HOST": "codex"}):
+                with patch.dict(os.environ, {"CADENCE_CODE_HOST": "codex"}):
                     first = runtime_module.VoiceRuntime(
                         Config(), data_dir=root / "codex-data"
                     )
-                with patch.dict(os.environ, {"VOICEBRIDGE_HOST": "claude-code"}):
+                with patch.dict(os.environ, {"CADENCE_CODE_HOST": "claude-code"}):
                     second = runtime_module.VoiceRuntime(
                         Config(), data_dir=root / "claude-data"
                     )
@@ -650,9 +684,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     side_effect=PermissionError("microphone permission denied"),
                 ),
             ):
@@ -674,10 +708,10 @@ class VoiceRuntimeTests(unittest.TestCase):
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
                 patch.dict(
-                    sys.modules, {"voicebridge.providers.registry": good_registry}
+                    sys.modules, {"cadence_code.providers.registry": good_registry}
                 ),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
             ):
@@ -694,9 +728,9 @@ class VoiceRuntimeTests(unittest.TestCase):
                 patch.object(
                     runtime_module, "SESSION_LOCK_PATH", root / "session.lock"
                 ),
-                patch.dict(sys.modules, {"voicebridge.providers.registry": registry}),
+                patch.dict(sys.modules, {"cadence_code.providers.registry": registry}),
                 patch(
-                    "voicebridge.audio.preflight.run_preflight",
+                    "cadence_code.audio.preflight.run_preflight",
                     return_value=_preflight_result(),
                 ),
             ):

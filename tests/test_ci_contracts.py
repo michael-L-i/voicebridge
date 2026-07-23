@@ -31,11 +31,11 @@ class CiContractTests(unittest.TestCase):
         self.assertIn("uv export --locked --no-dev --no-emit-project", workflow)
         self.assertIn("diff -u requirements.lock", workflow)
         self.assertIn("Bootstrap an empty production environment", workflow)
-        self.assertIn("./bin/voicebridge-mcp-bootstrap </dev/null", workflow)
+        self.assertIn("./bin/cadence-code-mcp-bootstrap </dev/null", workflow)
         self.assertIn("Verify the bootstrapped Kokoro English frontend", workflow)
         self.assertIn("-p test_kokoro_frontend.py", workflow)
-        self.assertIn("VOICEBRIDGE_DATA_DIR: ${{ runner.temp }}", workflow)
-        self.assertIn("VOICEBRIDGE_PYTHON: python", workflow)
+        self.assertIn("CADENCE_CODE_DATA_DIR: ${{ runner.temp }}", workflow)
+        self.assertIn("CADENCE_CODE_PYTHON: python", workflow)
         self.assertNotIn("uv sync --locked", workflow)
         self.assertIn("import mlx.core as mx", workflow)
         self.assertIn("scripts/validate_plugin.py", workflow)
@@ -107,7 +107,7 @@ class CiContractTests(unittest.TestCase):
         self.assertIn("--hash=sha256:", requirements)
 
     def test_bootstrap_scopes_the_misaki_metadata_workaround(self):
-        bootstrap = (ROOT / "bin/voicebridge-mcp-bootstrap").read_text(
+        bootstrap = (ROOT / "bin/cadence-code-mcp-bootstrap").read_text(
             encoding="utf-8"
         )
         install_lines = bootstrap.replace("\\\n", "").splitlines()

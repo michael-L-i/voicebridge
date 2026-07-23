@@ -1,13 +1,13 @@
-# voicebridge
+# Cadence Code
 
-[![CI](https://github.com/michael-L-i/voicebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-L-i/voicebridge/actions/workflows/ci.yml)
+[![CI](https://github.com/michael-L-i/cadence-code/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-L-i/cadence-code/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11-3.14](https://img.shields.io/badge/Python-3.11--3.14-blue.svg)](https://www.python.org/)
 
-A local voice interface for Codex and Claude Code on Apple Silicon. Start Voice
-Code, talk naturally, and let your coding agent decide what to say back — no
-daemon, no cloud, no second language model in the loop. See
-[VoiceBridge privacy](PRIVACY.md) for the exact local-processing and host
+A local voice interface for Codex and Claude Code on Apple Silicon. Start
+Talking, speak naturally, and let your coding agent decide what to say back —
+no daemon, no cloud, no second language model in the loop. See
+[Cadence Code privacy](PRIVACY.md) for the exact local-processing and host
 handoff boundary.
 
 ## Requirements
@@ -24,28 +24,33 @@ handoff boundary.
 **Claude Code**
 
 ```text
-/plugin marketplace add michael-L-i/voicebridge
-/plugin install voicebridge@voicebridge-marketplace
+/plugin marketplace add michael-L-i/cadence-code
+/plugin install cadence-code@cadence-code-marketplace
 ```
 
-Restart Claude Code, then run `/voicebridge:voice-code`.
+Restart Claude Code, then run `/cadence-code:start-talking`.
 
 **Codex** (CLI and desktop app; the IDE extension doesn't support plugins yet)
 
 ```bash
-codex plugin marketplace add michael-L-i/voicebridge
-codex plugin add voicebridge@voicebridge-marketplace
+codex plugin marketplace add michael-L-i/cadence-code
+codex plugin add cadence-code@cadence-code-marketplace
 ```
 
-Start a new Codex session, then run `$voice-code` (or pick Voice Code from
+Start a new Codex session, then run `$start-talking` (or pick Start Talking from
 `/skills`).
 
-On first run VoiceBridge shows a quick orientation, starts with Pocket TTS and
+On first run Cadence Code shows a quick orientation, starts with Pocket TTS and
 Parakeet 110M, requests microphone access, and downloads both models
-automatically. Change either model anytime with `/voicebridge:voice-settings`
+automatically. Change either model anytime with `/cadence-code:voice-settings`
 (Claude Code) or `$voice-settings` (Codex).
 
-If Claude Code's voice tools are still connecting on first use, Voice Code
+During a conversation, press Escape and use `/cadence-code:jump-in` or
+`$jump-in` to redirect by voice. Use `/cadence-code:wrap-up` or `$wrap-up` to
+end cleanly and release the local speech models. Saying "stop" or "goodbye"
+does the same thing.
+
+If Claude Code's voice tools are still connecting on first use, Start Talking
 finishes the one-time dependency setup and asks you to run `/reload-plugins`
 before invoking it again.
 
@@ -54,8 +59,8 @@ fully restart it — an already-running MCP process isn't replaced in place.
 
 ## How it works
 
-VoiceBridge runs one lightweight stdio MCP server alongside your coding agent.
-The agent decides what to say and writes every spoken response; VoiceBridge
+Cadence Code runs one lightweight stdio MCP server alongside your coding agent.
+The agent decides what to say and writes every spoken response; Cadence Code
 just converts that text to speech and your replies back to text, using local
 MLX models. Detailed answers stay on screen — voice gets a short, separately
 composed version, like a coworker giving you the useful part instead of
@@ -85,13 +90,13 @@ Parakeet 0.6B v3. Follow each model card for its upstream license terms.
 
 ## Configuration
 
-Settings live in `config.toml` — `~/.voicebridge` for Codex and direct
+Settings live in `config.toml` — `~/.cadence-code` for Codex and direct
 development, or Claude Code's per-plugin data directory. It has `[tts]`,
 `[stt]`, and `[audio]` sections for model, voice, speed, endpointing, and
 device choices; upgrades migrate old configs automatically.
 
 Model weights are cached in Hugging Face's shared cache
-(`~/.cache/huggingface/hub`), not VoiceBridge's own directory, so switching
+(`~/.cache/huggingface/hub`), not Cadence Code's own directory, so switching
 models keeps the previous one for other local MLX tools to reuse. Clean up
 manually with:
 
@@ -107,30 +112,30 @@ hf cache delete --sort size
   `[audio]` device settings, then restart the host.
 - **Setup or model download fails:** confirm the supported Python version,
   internet access, and free disk space, then restart the host to retry.
-- **Session already in use:** stop Voice Code in every Codex, Claude Code, and
+- **Session already in use:** stop Cadence Code in every Codex, Claude Code, and
   dev session — only one process can own the audio session at a time.
 - **An update still reports the old version:** fully exit every host process
-  that loaded VoiceBridge and start a new one.
+  that loaded Cadence Code and start a new one.
 
-For a checkout-based diagnosis, run `uv run --locked voicebridge doctor` or
-`uv run --locked voicebridge listen-test`.
+For a checkout-based diagnosis, run `uv run --locked cadence-code doctor` or
+`uv run --locked cadence-code listen-test`.
 
 ## Uninstall
 
-Stop every VoiceBridge session first.
+Stop every Cadence Code session first.
 
 ```bash
 # Codex
-codex plugin remove voicebridge@voicebridge-marketplace
-codex plugin marketplace remove voicebridge-marketplace
+codex plugin remove cadence-code@cadence-code-marketplace
+codex plugin marketplace remove cadence-code-marketplace
 
 # Claude Code
-claude plugin uninstall voicebridge@voicebridge-marketplace
-claude plugin marketplace remove voicebridge-marketplace
+claude plugin uninstall cadence-code@cadence-code-marketplace
+claude plugin marketplace remove cadence-code-marketplace
 ```
 
 Both leave configuration and the private Python environment behind (decline
-`--keep-data` in Claude Code to remove them too); delete `~/.voicebridge`
+`--keep-data` in Claude Code to remove them too); delete `~/.cadence-code`
 manually for Codex. Model weights stay in the shared Hugging Face cache — use
 the cache commands above to remove specific ones.
 
@@ -140,7 +145,7 @@ the cache commands above to remove specific ones.
 
 ```bash
 uv sync --locked --python 3.13
-uv run --locked voicebridge doctor
+uv run --locked cadence-code doctor
 ./dev check    # tests + plugin validation
 ./dev claude   # local branch test in Claude Code
 ./dev codex    # local branch test in Codex
@@ -153,9 +158,9 @@ release details are in [RELEASING.md](RELEASING.md).
 ## Contributing and support
 
 Contributions are welcome. Use
-[GitHub Discussions](https://github.com/michael-L-i/voicebridge/discussions)
+[GitHub Discussions](https://github.com/michael-L-i/cadence-code/discussions)
 for questions and the
-[issue forms](https://github.com/michael-L-i/voicebridge/issues/new/choose)
+[issue forms](https://github.com/michael-L-i/cadence-code/issues/new/choose)
 for bugs and feature proposals.
 
 Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security
@@ -163,4 +168,4 @@ issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-VoiceBridge is released under the [MIT License](LICENSE).
+Cadence Code is released under the [MIT License](LICENSE).

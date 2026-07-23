@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from voicebridge.audio import preflight
+from cadence_code.audio import preflight
 
 
 class _CallbackInputStream:

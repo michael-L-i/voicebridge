@@ -1,6 +1,6 @@
 # Governance
 
-VoiceBridge is maintained by [Michael Li](https://github.com/michael-L-i).
+Cadence Code is maintained by [Michael Li](https://github.com/michael-L-i).
 The maintainer sets project direction, reviews contributions, manages releases,
 and administers the repository.
 

@@ -2,18 +2,19 @@
 
 ## Project Overview
 
-`voicebridge` is a Codex and Claude Code plugin: a fully local voice companion
+`cadence-code` is a Codex and Claude Code plugin: a fully local voice companion
 for Apple Silicon. Its stdio MCP process owns local TTS and STT models directly
 while a voice conversation is active. There is no HTTP daemon or local
 summarization model; the host coding agent provides the exact text sent to TTS.
 
 MLX is the speech inference backend, not a second reasoning layer. Speech
 models run through `mlx-audio`; some TTS implementations reuse `mlx-lm` cache
-and sampling utilities internally, but VoiceBridge never loads a local
+and sampling utilities internally, but Cadence Code never loads a local
 reasoning or summarization model.
 
-There is no passive narration. Users explicitly start Voice Code with
-`$voice-code` or `/skills` in Codex, or `/voicebridge:voice-code` in Claude Code:
+There is no passive narration. Users explicitly choose Start Talking with
+`$start-talking` or `/skills` in Codex, or `/cadence-code:start-talking` in
+Claude Code:
 
 - On a new install, the host calls `voice_models`, shows the fixed first-run
   orientation, and persists its returned Pocket TTS and Parakeet 110M defaults
@@ -32,6 +33,8 @@ There is no passive narration. Users explicitly start Voice Code with
 - At that point the host calls `voice_stop`, which drops both providers, clears
   the MLX cache, and releases the active-session lock. If the host session ends
   unexpectedly, MCP process exit releases its memory and lock.
+- The explicit `$wrap-up` or `/cadence-code:wrap-up` workflow gives the same
+  clean ending on demand, allowing a short goodbye to finish before release.
 
 The MCP process itself is lightweight until voice mode starts. Models remain
 warm between turns, then are released when the conversation stops.
@@ -52,32 +55,33 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   prevents Claude Code from also discovering it as a project MCP server during
   direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
-- `skills/voice-code/`, `skills/voice-settings/`, and
-  `skills/voice-interrupt/`: canonical Codex workflows.
+- `skills/start-talking/`, `skills/jump-in/`, `skills/wrap-up/`, and
+  `skills/voice-settings/`: canonical Codex workflows.
 - `.agents/skills/`: relative symlinks to every canonical Codex skill so direct
   checkouts expose the same workflows as installed plugins.
-- `bin/voicebridge-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
-  under `VOICEBRIDGE_DATA_DIR` on first run (or after a dependency change),
-  then `exec`s into the real `voicebridge-mcp` entrypoint inside it. Claude Code
-  points that variable at its plugin data directory; Codex uses `~/.voicebridge`.
+- `bin/cadence-code-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
+  under `CADENCE_CODE_DATA_DIR` on first run (or after a dependency change),
+  then `exec`s into the real `cadence-code-mcp` entrypoint inside it. Claude Code
+  points that variable at its plugin data directory; Codex uses `~/.cadence-code`.
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
-- `commands/voice-code.md` and `commands/voice-interrupt.md`: the corresponding
-  Claude Code slash commands, namespaced to the plugin automatically.
+- `commands/start-talking.md`, `commands/jump-in.md`, and
+  `commands/wrap-up.md`: the corresponding Claude Code slash commands,
+  namespaced to the plugin automatically.
 
 ## Important Paths
 
-- `voicebridge/cli.py`: Click CLI with `doctor` and `listen-test` for direct
+- `cadence_code/cli.py`: Click CLI with `doctor` and `listen-test` for direct
   development. The plugin path invokes the MCP bootstrap instead.
-- `voicebridge/config.py`: Pydantic config models. `CONFIG_DIR` reads the
-  `VOICEBRIDGE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
-  manifest, falling back to `~/.voicebridge` for Codex and direct-Python dev).
+- `cadence_code/config.py`: Pydantic config models. `CONFIG_DIR` reads the
+  `CADENCE_CODE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
+  manifest, falling back to `~/.cadence-code` for Codex and direct-Python dev).
   Existing configs are migrated away from the retired `[daemon]` and
   `[summarizer]` sections without replacing current voice or audio choices.
 - `config/default_config.toml`: default speech model and audio settings
   copied into the user's config directory on first run.
-- `voicebridge/audio/capture.py` / `playback.py`: mic capture using a real
+- `cadence_code/audio/capture.py` / `playback.py`: mic capture using a real
   WebRTC voice-activity classifier (not an amplitude threshold -- ported from
   studying voicemode's approach, a meaningfully more reliable
   speech/silence signal across rooms and mics), callback-driven so a
@@ -86,17 +90,17 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   start/end chimes mark exactly when the mic is listening. Playback and
   capture are serialized through a shared lock (never record and speak at
   the same instant -- there's no echo cancellation).
-- `voicebridge/audio/preflight.py`: validates configured audio devices and
+- `cadence_code/audio/preflight.py`: validates configured audio devices and
   briefly opens the mic without retaining samples before model setup begins.
-- `voicebridge/providers/`: STT/TTS provider abstractions
+- `cadence_code/providers/`: STT/TTS provider abstractions
   (`TTSProvider`/`STTProvider`) and a plain-dict registry keyed by config
   string. TTS providers are Pocket TTS, Kokoro, Chatterbox Turbo, and Qwen
   0.6B; STT providers are Moonshine Base, Parakeet 110M, and Parakeet 0.6B.
-- `voicebridge/mcp/server.py`: the small MCP tool surface -- `voice_models`,
+- `cadence_code/mcp/server.py`: the small MCP tool surface -- `voice_models`,
   `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`,
   `voice_interrupt`, `voice_stop`, and `voice_status`.
-- `voicebridge/mcp/runtime.py`: owns warm model providers and the advisory
-  machine-wide session lock. Only one VoiceBridge conversation across either
+- `cadence_code/mcp/runtime.py`: owns warm model providers and the advisory
+  machine-wide session lock. Only one Cadence Code conversation across either
   host can use the audio devices and model memory at a time. Status includes
   host, first-run state, running version, and capture timing so stale
   post-update MCP processes are visible.
@@ -107,24 +111,24 @@ Run commands from the repository root.
 
 ```bash
 python -m pip install -e .
-voicebridge doctor
-voicebridge listen-test
+cadence-code doctor
+cadence-code listen-test
 python -m unittest discover -s tests -v
 ```
 
 For behavioral changes, run the unit tests plus the narrowest relevant manual
-check, usually `voicebridge doctor`, `voicebridge listen-test`, or a direct
+check, usually `cadence-code doctor`, `cadence-code listen-test`, or a direct
 `voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop`
 sequence through a real Codex or Claude Code MCP client session.
 
 ## Visible Plugin Test Sessions
 
-When the user asks to launch a VoiceBridge test instance, use `cmux` to create
+When the user asks to launch a Cadence Code test instance, use `cmux` to create
 and drive a visible, clearly named tab/surface in the user's current workspace.
-Do not create a separate native cmux window unless the user asks for one. Start
-Voice Code on the user's behalf and leave the session open for hands-on audio
-testing; do not ask the user to type routine launch, install, or initialization
-commands.
+Do not create a separate native cmux window unless the user asks for one. Invoke
+Start Talking on the user's behalf and leave the session open for hands-on
+audio testing; do not ask the user to type routine launch, install, or
+initialization commands.
 
 Support both Claude Code and Codex as first-class test hosts. If the user does
 not name a host, default to Claude Code. If the user names Codex, launch and
@@ -132,17 +136,17 @@ initialize a Codex test tab instead; do not substitute Claude Code merely
 because its direct-checkout workflow is simpler.
 
 - For a local Claude Code branch test, run `./dev claude`, then send
-  `/voicebridge:voice-code`. This tests the checkout directly through
+  `/cadence-code:start-talking`. This tests the checkout directly through
   `--plugin-dir` instead of the installed plugin cache.
-- For a local Codex branch test, run `./dev codex`, then send `$voice-code`.
+- For a local Codex branch test, run `./dev codex`, then send `$start-talking`.
   The launcher injects the checkout's MCP server for that process only and does
   not install a plugin or configure a marketplace.
 - For a GitHub release test, update/install the normal GitHub-backed plugin,
   verify the requested version and source, launch the host without a local
-  plugin override, and start Voice Code.
+  plugin override, and invoke Start Talking.
 - Name the cmux tab with the host, source (`local` or `release`), branch or
   version, and use `cmux read-screen` to verify startup.
-- Fully stop or close an existing VoiceBridge test before launching another;
+- Fully stop or close an existing Cadence Code test before launching another;
   the machine-wide audio-session lock permits only one active conversation.
 - Treat a new host process as required after changing or reinstalling a plugin.
   Report the launched host, source path or release version, and cmux target.

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are made on the latest released version of VoiceBridge. Older
+Security fixes are made on the latest released version of Cadence Code. Older
 releases are not maintained separately; users should update to the newest
 release before reporting a problem that may already be fixed.
 
@@ -14,7 +14,7 @@ before public disclosure.
 
 Include, when possible:
 
-- the affected VoiceBridge and macOS versions;
+- the affected Cadence Code and macOS versions;
 - the impact and a minimal reproduction;
 - whether the issue requires a malicious plugin, model, configuration, or
   local user; and
