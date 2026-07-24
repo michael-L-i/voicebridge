@@ -13,6 +13,7 @@ Commands:
   inspector   Open the checkout's MCP server in MCP Inspector
   claude      Launch Claude Code with the checkout loaded directly
   codex       Launch Codex with the checkout's MCP server directly
+  cursor      Launch Cursor Agent with the checkout loaded directly
   agy         Launch Antigravity CLI with the checkout loaded directly
   reset       Remove all isolated local-development state
 EOF
@@ -60,6 +61,18 @@ keeping the private venv.
 EOF
 }
 
+cursor_help() {
+  cat <<'EOF'
+Usage: ./dev cursor [--fresh] [cursor-agent-options]
+
+Launch Cursor Agent from the repository root. The checkout's workspace MCP
+configuration and shared Agent Skills load directly; no plugin is installed and
+no user Cursor configuration is changed. Inside Cursor, run /start-talking.
+Use --fresh to clear the development configuration and onboarding marker while
+keeping the private venv.
+EOF
+}
+
 agy_help() {
   cat <<'EOF'
 Usage: ./dev agy [--fresh] [agy-options]
@@ -78,9 +91,9 @@ Usage: ./dev reset
 
 Move the checkout's complete .cadence-code-dev directory to macOS Trash. This
 removes development venvs, configuration, and onboarding state for Inspector,
-Claude Code, Codex, and Antigravity. Production plugin data and shared model
-caches are not touched. Close every Cadence Code host session before running
-this command.
+    Claude Code, Codex, Cursor, and Antigravity. Production plugin data and shared
+    model caches are not touched. Close every Cadence Code host session before
+    running this command.
 EOF
 }
 
@@ -309,6 +322,47 @@ run_codex() {
   exec "${codex_bin}" "${cadence_code_config[@]}" "${codex_args[@]}"
 }
 
+run_cursor() {
+  if [ "${1:-}" = "--help" ]; then
+    cursor_help
+    return
+  fi
+
+  local fresh=0
+  local -a cursor_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        cursor_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local cursor_bin="${CADENCE_CODE_DEV_CURSOR_BIN:-agent}"
+  if ! command -v "${cursor_bin}" >/dev/null 2>&1; then
+    echo "[cadence-code-dev] ERROR: Cursor Agent is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir cursor)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[cadence-code-dev] reset Cursor development onboarding"
+  fi
+  cd "${REPO_ROOT}"
+  export CADENCE_CODE_DATA_DIR="${data_dir}"
+  export CADENCE_CODE_HOST="cursor"
+  if [ "${#cursor_args[@]}" -eq 0 ]; then
+    exec "${cursor_bin}" --workspace "${REPO_ROOT}"
+  fi
+  exec "${cursor_bin}" --workspace "${REPO_ROOT}" "${cursor_args[@]}"
+}
+
 run_agy() {
   if [ "${1:-}" = "--help" ]; then
     agy_help
@@ -366,6 +420,10 @@ case "${1:-}" in
   codex)
     shift
     run_codex "$@"
+    ;;
+  cursor)
+    shift
+    run_cursor "$@"
     ;;
   agy|antigravity)
     shift
