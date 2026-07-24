@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
+SKILL_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+PLUGIN_ROOT=$(cd "${SKILL_ROOT}/../../.." && pwd -P)
+exec "${PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap" --setup

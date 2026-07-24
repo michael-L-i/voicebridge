@@ -1,20 +1,21 @@
 ---
 name: jump-in
-description: Interrupt an active Cadence Code conversation and add fresh spoken guidance to the current Codex or Antigravity task. Use only when the user explicitly invokes $jump-in or /jump-in after stopping the current host turn.
+description: Interrupt an active Cadence Code conversation and add fresh spoken guidance to the current Codex, Cursor, or Antigravity task. Use only when the user explicitly invokes $jump-in or /jump-in after stopping the current host turn.
+disable-model-invocation: true
 ---
 
 # Jump In
 
 Use `mcp__cadence-code__voice_interrupt` to stop current Cadence Code audio and
 capture one fresh spoken instruction. Cadence Code keeps its local speech models
-loaded; this does not end the Cadence Code session. Antigravity may display the
-tool as `voice_interrupt` under the `cadence-code` MCP server.
+loaded; this does not end the Cadence Code session. Cursor and Antigravity may
+display the tool as `voice_interrupt` under the `cadence-code` MCP server.
 
 1. Call `mcp__cadence-code__voice_interrupt` immediately. Do not call
    `voice_start`, `voice_speak`, or ordinary `voice_listen` first.
 2. If it returns `ok: false`, show the error. When there is no active session,
    tell the user to invoke `$start-talking` in Codex or `/start-talking` in
-   Antigravity; do not start Cadence Code implicitly.
+   Cursor or Antigravity; do not start Cadence Code implicitly.
 3. Treat every non-empty transcript as added guidance for the interrupted task,
    including one returned with `end_reason: "timeout"`. Continue from the
    current conversation and repository state without asking whether to resume.

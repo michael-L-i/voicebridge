@@ -19,15 +19,37 @@ class PluginContractTests(unittest.TestCase):
             project_version = tomllib.load(file)["project"]["version"]
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
+        cursor = _json(".cursor-plugin/plugin.json")
 
         self.assertEqual(project_version, "0.6.0")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
+        self.assertEqual(cursor["version"], project_version)
         self.assertEqual(
             claude["mcpServers"]["cadence-code"]["env"]["CADENCE_CODE_HOST"],
             "claude-code",
         )
         self.assertEqual(codex["skills"], "./skills/")
+        self.assertEqual(cursor["skills"], "./skills/")
+
+    def test_cursor_plugin_bundles_explicit_skills_and_local_mcp(self):
+        plugin = _json(".cursor-plugin/plugin.json")
+        marketplace = _json(".cursor-plugin/marketplace.json")
+        server = _json("mcp.json")["mcpServers"]["cadence-code"]
+
+        self.assertEqual(plugin["name"], "cadence-code")
+        self.assertEqual(plugin["displayName"], "Cadence Code")
+        self.assertEqual(plugin["commands"], [])
+        self.assertEqual(plugin["mcpServers"], "./mcp.json")
+        self.assertEqual(marketplace["plugins"][0]["name"], "cadence-code")
+        self.assertEqual(marketplace["plugins"][0]["source"], "./")
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(
+            server["args"],
+            ["${CURSOR_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"],
+        )
+        self.assertEqual(server["cwd"], "${CURSOR_PLUGIN_ROOT}")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "cursor")
 
     def test_codex_manifest_bundles_mcp_without_project_config(self):
         codex = _json(".codex-plugin/plugin.json")
@@ -95,6 +117,7 @@ class PluginContractTests(unittest.TestCase):
         }
 
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         self.assertIn("explicitly invokes $start-talking", skill)
         self.assertIn("If `first_run` is true", skill)
         self.assertIn("before any", skill)
@@ -109,6 +132,8 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn('error_code: "session_not_started"', command)
         self.assertIn("/start-talking", skill)
         self.assertIn("`antigravity`", skill)
+        self.assertIn("`cursor`", skill)
+        self.assertIn("bundled `scripts/setup` skill script", skill)
 
     def test_first_run_onboarding_covers_text_voice_and_host_controls(self):
         codex = (ROOT / "skills/start-talking/SKILL.md").read_text(
@@ -164,6 +189,7 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $voice-settings", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         for tool in {"voice_status", "voice_models", "voice_configure", "voice_stop"}:
             self.assertIn(f"mcp__cadence-code__{tool}", skill)
             self.assertIn(f"mcp__cadence-code__{tool}", command)
@@ -218,6 +244,7 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $jump-in", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         self.assertIn("mcp__cadence-code__voice_interrupt", skill)
         self.assertIn("mcp__cadence-code__voice_interrupt", command)
         self.assertIn("added guidance", skill)
@@ -234,6 +261,7 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $wrap-up", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         for workflow in (skill, command):
             self.assertIn("mcp__cadence-code__voice_status", workflow)
             self.assertIn("mcp__cadence-code__voice_speak", workflow)
