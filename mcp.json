@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cadence-code": {
+      "command": "bash",
+      "args": [
+        "${CURSOR_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
+      ],
+      "cwd": "${CURSOR_PLUGIN_ROOT}",
+      "env": {
+        "CADENCE_CODE_HOST": "cursor"
+      }
+    }
+  }
+}

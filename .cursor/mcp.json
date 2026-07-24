@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cadence-code": {
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/bin/cadence-code-mcp-bootstrap"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "CADENCE_CODE_HOST": "cursor"
+      }
+    }
+  }
+}

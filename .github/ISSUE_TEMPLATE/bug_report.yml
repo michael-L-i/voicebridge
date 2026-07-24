@@ -34,6 +34,7 @@ body:
       options:
         - Codex
         - Claude Code
+        - Cursor
         - Google Antigravity
     validations:
       required: true
@@ -41,7 +42,7 @@ body:
     id: host_version
     attributes:
       label: Host version
-      description: Use the version reported by `codex --version`, `claude --version`, or `agy --version`.
+      description: Use the version reported by `codex --version`, `claude --version`, `cursor --version`, or `agy --version`.
       placeholder: Host name and version
     validations:
       required: true

@@ -85,6 +85,9 @@ class VoiceRuntime:
         self.data_dir = Path(data_dir) if data_dir is not None else CONFIG_DIR
         self.host = os.environ.get("CADENCE_CODE_HOST", "direct")
         self._operation_lock = threading.RLock()
+        self._start_state_lock = threading.RLock()
+        self._start_thread: threading.Thread | None = None
+        self._start_error: str | None = None
         self._session_lock_file = None
         self._last_preflight: dict | None = None
         self._tts: Any = None
@@ -99,8 +102,38 @@ class VoiceRuntime:
     def ready(self) -> bool:
         return self._tts is not None and self._stt is not None
 
-    def start(self) -> dict:
+    def start(self, *, wait: bool = True) -> dict:
         """Acquire the local voice session and warm both speech models."""
+        if wait:
+            return self._start_sync()
+
+        with self._start_state_lock:
+            if self.ready:
+                return {
+                    **self.status(already_ready=True),
+                    "preflight": self._last_preflight,
+                }
+            if self._start_thread is not None and self._start_thread.is_alive():
+                return self.status()
+
+            first_run = self._is_first_run()
+            self._start_error = None
+            self._start_thread = threading.Thread(
+                target=self._start_in_background,
+                name="cadence-code-model-loader",
+                daemon=True,
+            )
+            self._start_thread.start()
+            return self.status(first_run=first_run)
+
+    def _start_in_background(self) -> None:
+        try:
+            self._start_sync()
+        except Exception as exc:
+            with self._start_state_lock:
+                self._start_error = str(exc)
+
+    def _start_sync(self) -> dict:
         with self._operation_lock:
             if self.ready:
                 return {
@@ -292,13 +325,22 @@ class VoiceRuntime:
         already_ready: bool = False,
         first_run: bool | None = None,
     ) -> dict:
+        with self._start_state_lock:
+            starting = (
+                self._start_thread is not None and self._start_thread.is_alive()
+            )
+            start_error = self._start_error
+
         return {
             "version": __version__,
             "host": self.host,
             "first_run": self._is_first_run() if first_run is None else first_run,
             "ready": self.ready,
+            "starting": starting,
+            "start_error": start_error,
             "already_ready": already_ready,
             "backend": "mlx-audio",
+            "preflight": self._last_preflight,
             "capture": {
                 "silence_ms": self.config.stt.silence_ms,
                 "timeout_ms": self.config.stt.max_listen_ms,

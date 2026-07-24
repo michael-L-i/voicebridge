@@ -232,6 +232,93 @@ class DevCliTests(unittest.TestCase):
             self.assertTrue(keep.exists())
         self.assertNotIn("arg=--fresh", result.stdout)
 
+    def test_cursor_loads_checkout_with_development_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_cursor = temp / "agent"
+            fake_cursor.write_text(
+                "#!/bin/bash\n"
+                "printf 'cwd=%s\\n' \"$PWD\"\n"
+                "printf 'data=%s\\n' \"$CADENCE_CODE_DATA_DIR\"\n"
+                "printf 'host=%s\\n' \"$CADENCE_CODE_HOST\"\n"
+                "printf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_cursor.chmod(0o755)
+            data_root = temp / "data"
+            env = {
+                **os.environ,
+                "CADENCE_CODE_DEV_CURSOR_BIN": str(fake_cursor),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
+            }
+
+            result = subprocess.run(
+                [DEV, "cursor", "--model", "test-model"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        arguments = result.stdout.splitlines()
+        self.assertIn(f"cwd={ROOT}", arguments)
+        self.assertIn(f"data={data_root.resolve()}/cursor", arguments)
+        self.assertIn("host=cursor", arguments)
+        self.assertIn("arg=--workspace", arguments)
+        self.assertIn(f"arg={ROOT}", arguments)
+        self.assertIn("arg=--model", arguments)
+        self.assertIn("arg=test-model", arguments)
+
+    def test_cursor_workspace_mcp_uses_checkout_bootstrap(self):
+        server = json.loads(
+            (ROOT / ".cursor/mcp.json").read_text(encoding="utf-8")
+        )["mcpServers"]["cadence-code"]
+
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(
+            server["args"],
+            ["${workspaceFolder}/bin/cadence-code-mcp-bootstrap"],
+        )
+        self.assertEqual(server["cwd"], "${workspaceFolder}")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "cursor")
+
+    def test_cursor_fresh_resets_onboarding_but_keeps_venv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_cursor = temp / "agent"
+            fake_cursor.write_text(
+                "#!/bin/bash\nprintf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_cursor.chmod(0o755)
+            data_root = temp / "data"
+            cursor_data = data_root / "cursor"
+            venv = cursor_data / "venv"
+            venv.mkdir(parents=True)
+            (cursor_data / "config.toml").write_text("configured\n")
+            (cursor_data / "onboarding-v1.complete").write_text("done\n")
+            keep = venv / "keep"
+            keep.write_text("warm\n")
+            env = {
+                **os.environ,
+                "CADENCE_CODE_DEV_CURSOR_BIN": str(fake_cursor),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
+            }
+
+            result = subprocess.run(
+                [DEV, "cursor", "--fresh"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((cursor_data / "config.toml").exists())
+            self.assertFalse((cursor_data / "onboarding-v1.complete").exists())
+            self.assertTrue(keep.exists())
+        self.assertNotIn("arg=--fresh", result.stdout)
+
     def test_agy_loads_checkout_with_development_data(self):
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)

@@ -4,11 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11-3.14](https://img.shields.io/badge/Python-3.11--3.14-blue.svg)](https://www.python.org/)
 
-A local voice interface for Codex, Claude Code, and Google Antigravity on Apple
-Silicon. Start Talking, speak naturally, and let your coding agent decide what
-to say back — no daemon, no cloud, no second language model in the loop. See
-[Cadence Code privacy](PRIVACY.md) for the exact local-processing and host
-handoff boundary.
+A local voice interface for Codex, Claude Code, Cursor, and Google Antigravity
+on Apple Silicon. Start Talking, speak naturally, and let your coding agent
+decide what to say back — no daemon, no cloud, no second language model in the
+loop. See [Cadence Code privacy](PRIVACY.md) for the exact local-processing and
+host handoff boundary.
 
 ## Requirements
 
@@ -40,6 +40,14 @@ codex plugin add cadence-code@cadence-code-marketplace
 Start a new Codex session, then run `$start-talking` (or pick Start Talking from
 `/skills`).
 
+**Cursor 2.5+** (IDE and Agent CLI)
+
+```text
+/add-plugin cadence-code@https://github.com/michael-L-i/cadence-code
+```
+
+Start a new Cursor session, then run `/start-talking`.
+
 **Google Antigravity** (AGY CLI and IDE)
 
 ```bash
@@ -51,22 +59,25 @@ Start a new AGY or Antigravity IDE session, then run `/start-talking`.
 On first run Cadence Code shows a quick orientation, starts with Pocket TTS and
 Parakeet 110M, requests microphone access, and downloads both models
 automatically. Change either model anytime with `/cadence-code:voice-settings`
-(Claude Code), `$voice-settings` (Codex), or `/voice-settings` (Antigravity).
+(Claude Code), `$voice-settings` (Codex), or `/voice-settings` (Cursor and
+Antigravity).
 
-During a conversation, press Escape and use `/cadence-code:jump-in` or
-`$jump-in` in those hosts, or `/jump-in` in Antigravity, to redirect by voice.
-Use `/cadence-code:wrap-up`, `$wrap-up`, or `/wrap-up`, respectively, to end
-cleanly and release the local speech models. Saying "stop" or "goodbye" does
-the same thing.
+During a conversation, press Escape and use `/cadence-code:jump-in` in Claude
+Code, `$jump-in` in Codex, or `/jump-in` in Cursor and Antigravity to redirect
+by voice. Use `/cadence-code:wrap-up`, `$wrap-up`, or `/wrap-up`,
+respectively, to end cleanly and release the local speech models. Saying "stop"
+or "goodbye" does the same thing.
 
-If Claude Code's voice tools are still connecting on first use, Start Talking
-finishes the one-time dependency setup and asks you to run `/reload-plugins`
-before invoking it again.
+If the voice tools are still connecting on first use, Start Talking finishes
+the one-time dependency setup. Claude Code then asks you to run
+`/reload-plugins`; Cursor asks you to restart the IDE or Agent CLI. Invoke Start
+Talking again afterward.
 
 To update Codex or Claude Code, refresh and update through that host's plugin
-commands. For Antigravity, uninstall and re-run the install command above.
-Fully restart the host afterward — an already-running MCP process isn't
-replaced in place.
+commands. In Cursor, manage the direct GitHub plugin from
+**Cursor Settings > Plugins**. For Antigravity, uninstall and re-run the install
+command above. Fully restart the host afterward — an already-running MCP
+process isn't replaced in place.
 
 ## How it works
 
@@ -78,8 +89,8 @@ composed version, like a coworker giving you the useful part instead of
 reading a terminal response aloud.
 
 Only one voice conversation can hold the microphone and model memory at a
-time. A machine-wide lock keeps Codex, Claude Code, Antigravity, and development
-sessions from colliding.
+time. A machine-wide lock keeps Codex, Claude Code, Cursor, Antigravity, and
+development sessions from colliding.
 
 ## Model choices
 
@@ -101,10 +112,11 @@ Parakeet 0.6B v3. Follow each model card for its upstream license terms.
 
 ## Configuration
 
-Settings live in `config.toml` — `~/.cadence-code` for Codex, Antigravity, and
-direct development, or Claude Code's per-plugin data directory. It has
-`[tts]`, `[stt]`, and `[audio]` sections for model, voice, speed, endpointing,
-and device choices; upgrades migrate old configs automatically.
+Settings live in `config.toml` — `~/.cadence-code` for Codex, Cursor,
+Antigravity, and direct development, or Claude Code's per-plugin data
+directory. It has `[tts]`, `[stt]`, and `[audio]` sections for model, voice,
+speed, endpointing, and device choices; upgrades migrate old configs
+automatically.
 
 Model weights are cached in Hugging Face's shared cache
 (`~/.cache/huggingface/hub`), not Cadence Code's own directory, so switching
@@ -118,15 +130,14 @@ hf cache delete --sort size
 
 ## Troubleshooting
 
-- **No microphone or output:** allow mic access for Codex, Claude Code, or
-  Antigravity in macOS **System Settings > Privacy & Security > Microphone**,
-  verify the
-  `[audio]` device settings, then restart the host.
+- **No microphone or output:** allow mic access for Codex, Claude Code, Cursor,
+  or Antigravity in macOS **System Settings > Privacy & Security >
+  Microphone**, verify the `[audio]` device settings, then restart the host.
 - **Setup or model download fails:** confirm the supported Python version,
   internet access, and free disk space, then restart the host to retry.
 - **Session already in use:** stop Cadence Code in every Codex, Claude Code,
-  Antigravity, and dev session — only one process can own the audio session at
-  a time.
+  Cursor, Antigravity, and dev session — only one process can own the audio
+  session at a time.
 - **An update still reports the old version:** fully exit every host process
   that loaded Cadence Code and start a new one.
 
@@ -150,10 +161,12 @@ claude plugin marketplace remove cadence-code-marketplace
 agy plugin uninstall cadence-code
 ```
 
-These leave configuration and the private Python environment behind (decline
-`--keep-data` in Claude Code to remove them too); delete `~/.cadence-code`
-manually for Codex and Antigravity. Model weights stay in the shared Hugging
-Face cache — use the cache commands above to remove specific ones.
+For Cursor, open **Cursor Settings > Plugins**, select Cadence Code, and choose
+**Uninstall**. These leave configuration and the private Python environment
+behind (decline `--keep-data` in Claude Code to remove them too); delete
+`~/.cadence-code` manually for Codex, Cursor, and Antigravity. Model weights
+stay in the shared Hugging Face cache — use the cache commands above to remove
+specific ones.
 
 ## Development
 
@@ -165,6 +178,7 @@ uv run --locked cadence-code doctor
 ./dev check    # tests + plugin validation
 ./dev claude   # local branch test in Claude Code
 ./dev codex    # local branch test in Codex
+./dev cursor   # local branch test in Cursor Agent
 ./dev agy      # local branch test in Antigravity CLI
 ```
 

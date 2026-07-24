@@ -1,6 +1,7 @@
 ---
 name: start-talking
-description: Start and run an explicit Cadence Code conversation with Codex or Antigravity using fully local speech input and output. Use only when the user explicitly invokes $start-talking, /start-talking, or asks to start talking with Cadence Code.
+description: Start and run an explicit Cadence Code conversation with Codex, Cursor, or Antigravity using fully local speech input and output. Use only when the user explicitly invokes $start-talking, /start-talking, or asks to start talking with Cadence Code.
+disable-model-invocation: true
 ---
 
 # Start Talking
@@ -9,11 +10,18 @@ Run a deliberate voice loop through the `mcp__cadence-code__voice_status`,
 `mcp__cadence-code__voice_models`, `mcp__cadence-code__voice_configure`,
 `mcp__cadence-code__voice_start`, `mcp__cadence-code__voice_speak`,
 `mcp__cadence-code__voice_listen`, and `mcp__cadence-code__voice_stop` tools.
-Antigravity may display these as the corresponding `voice_status`,
+Cursor and Antigravity may display these as the corresponding `voice_status`,
 `voice_models`, `voice_configure`, `voice_start`, `voice_speak`,
 `voice_listen`, and `voice_stop` tools under the `cadence-code` MCP server.
 Cadence Code only performs speech input and output. The host agent controls the
 conversation and authors every word sent to speech.
+
+If the Cadence Code MCP tools are unavailable or still connecting, run the
+bundled `scripts/setup` skill script and wait for it to finish. Do not
+background it or retry it in parallel. On failure, show the error and end. On
+success, ask the user to restart Cursor or its Agent CLI and invoke
+`/start-talking` again, then end without attempting an MCP tool call. This
+fallback applies to Cursor only; other hosts keep their existing setup flow.
 
 Maintain two outputs for completed work:
 
@@ -62,14 +70,20 @@ Maintain two outputs for completed work:
    configuration fails, show the error and end without calling `voice_start`.
    Existing users with `first_run: false` skip the fixed script and automatic
    default configuration silently.
-2. Call `voice_start` and wait for the audio preflight and local speech models.
-   Do not call any Cadence Code audio tool before this explicit skill invocation.
-   If it returns `ok: false`, show the error and end without retrying.
-3. Verify the result includes `version`, `host`, `capture`, and `preflight`.
-   The host must be `codex` when invoked from Codex or `antigravity` when
-   invoked from Antigravity. If it does not match, the MCP process is stale or
-   misconfigured: call `voice_stop`, ask the user to restart the current host
-   after updating or reinstalling the plugin, and end.
+2. In Cursor, call `voice_start` with `wait: false`, then poll `voice_status`
+   until `ready` is true. While `starting` is true, wait between polls; do not
+   narrate or start other work. If `start_error` is set, show it and end without
+   retrying. In Codex or Antigravity, call `voice_start` normally and wait for
+   the audio preflight and local speech models. Do not call any Cadence Code
+   audio tool before this explicit skill invocation. If either start path
+   returns `ok: false`, show the error and end without retrying.
+3. Verify the completed start result or final status includes `version`, `host`,
+   `capture`, and `preflight`.
+   The host must be `codex` when invoked from Codex, `cursor` when invoked from
+   Cursor, or `antigravity` when invoked from Antigravity. If it does not match,
+   the MCP process is stale or misconfigured: call `voice_stop`, ask the user
+   to restart the current host after updating or reinstalling the plugin, and
+   end.
 4. Speak a greeting with `listen_after: true`, then call `voice_listen`
    immediately. If `first_run` was true, use this short introduction verbatim:
    "Welcome to Cadence Code. I want to talk with you about whatever you're
@@ -115,7 +129,7 @@ never between turns. Keep speech brief unless the user explicitly requests a
 spoken walkthrough.
 
 If the user presses Escape during a turn, they can invoke `$jump-in` in Codex
-or `/jump-in` in Antigravity to
+or `/jump-in` in Cursor or Antigravity to
 silence current Cadence Code audio and add spoken guidance without unloading the
 models. The separate Jump In skill owns that recovery workflow. The user can
 invoke `$wrap-up` or `/wrap-up` to end the conversation directly.

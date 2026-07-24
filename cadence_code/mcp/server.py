@@ -43,15 +43,17 @@ def voice_configure(tts: str, stt: str) -> dict:
 
 
 @mcp.tool()
-def voice_start() -> dict:
+def voice_start(wait: bool = True) -> dict:
     """Start a local voice conversation and load the TTS and STT models.
 
     Call only after an explicit user request for a Cadence Code conversation,
     once before the first voice_speak. The initial call checks microphone and
     speaker access before local model files are downloaded or loaded; later
-    turns reuse the warm models. Only one conversation can be active per Mac."""
+    turns reuse the warm models. Set wait false in hosts with short MCP tool
+    deadlines, then poll voice_status until ready or start_error is set. Only
+    one conversation can be active per Mac."""
     try:
-        return {"ok": True, **runtime.start()}
+        return {"ok": True, **runtime.start(wait=wait)}
     except Exception as exc:
         return _error(exc)
 

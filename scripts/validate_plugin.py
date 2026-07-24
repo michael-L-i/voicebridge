@@ -61,18 +61,41 @@ def validate_antigravity_development_mcp(failures: list[str]) -> None:
         failures.append("Antigravity development MCP must allow long model setup")
 
 
+def validate_cursor_development_mcp(failures: list[str]) -> None:
+    server = load_json(".cursor/mcp.json").get("mcpServers", {}).get(
+        "cadence-code", {}
+    )
+    if server.get("command") != "bash":
+        failures.append("Cursor development MCP must launch through bash")
+    if server.get("args") != [
+        "${workspaceFolder}/bin/cadence-code-mcp-bootstrap"
+    ]:
+        failures.append("Cursor development MCP must use the checkout bootstrap")
+    if server.get("cwd") != "${workspaceFolder}":
+        failures.append("Cursor development MCP must run from the checkout root")
+    if server.get("env", {}).get("CADENCE_CODE_HOST") != "cursor":
+        failures.append("Cursor development MCP must preserve its host identity")
+
+
 def main() -> int:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project = tomllib.load(file)["project"]
 
     claude = load_json(".claude-plugin/plugin.json")
     codex = load_json(".codex-plugin/plugin.json")
+    cursor = load_json(".cursor-plugin/plugin.json")
+    cursor_marketplace = load_json(".cursor-plugin/marketplace.json")
+    cursor_mcp = load_json("mcp.json")
     antigravity = load_json("plugin.json")
     antigravity_mcp = load_json("mcp_config.json")
     version = project["version"]
 
     failures: list[str] = []
-    if claude.get("version") != version or codex.get("version") != version:
+    if (
+        claude.get("version") != version
+        or codex.get("version") != version
+        or cursor.get("version") != version
+    ):
         failures.append("plugin manifest versions must match pyproject.toml")
     if claude.get("mcpServers", {}).get("cadence-code", {}).get("command") != (
         "${CLAUDE_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
@@ -85,6 +108,30 @@ def main() -> int:
         failures.append("Codex MCP server must use the repository bootstrap")
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
+    if cursor.get("name") != "cadence-code":
+        failures.append("Cursor plugin name must be cadence-code")
+    if cursor.get("skills") != "./skills/":
+        failures.append("Cursor plugin must bundle the canonical skills")
+    if cursor.get("commands") != []:
+        failures.append("Cursor plugin must not load Claude-specific commands")
+    if cursor.get("mcpServers") != "./mcp.json":
+        failures.append("Cursor plugin must use its root MCP configuration")
+    cursor_entry = (cursor_marketplace.get("plugins") or [{}])[0]
+    if cursor_entry.get("name") != "cadence-code":
+        failures.append("Cursor marketplace must list cadence-code")
+    if cursor_entry.get("source") != "./":
+        failures.append("Cursor marketplace must point at the repository root")
+    cursor_server = cursor_mcp.get("mcpServers", {}).get("cadence-code", {})
+    if cursor_server.get("command") != "bash":
+        failures.append("Cursor MCP server must launch through bash")
+    if cursor_server.get("args") != [
+        "${CURSOR_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
+    ]:
+        failures.append("Cursor MCP server must use the installed bootstrap")
+    if cursor_server.get("cwd") != "${CURSOR_PLUGIN_ROOT}":
+        failures.append("Cursor MCP server must run from its plugin root")
+    if cursor_server.get("env", {}).get("CADENCE_CODE_HOST") != "cursor":
+        failures.append("Cursor MCP server must preserve its host identity")
     if antigravity.get("$schema") != (
         "https://antigravity.google/schemas/v1/plugin.json"
     ):
@@ -108,11 +155,16 @@ def main() -> int:
         failures.append("Antigravity MCP server must allow long model setup")
 
     validate_development_skills(failures)
+    validate_cursor_development_mcp(failures)
     validate_antigravity_development_mcp(failures)
 
     required_paths = [
         ".agents/mcp_config.json",
+        ".cursor/mcp.json",
+        ".cursor-plugin/marketplace.json",
+        ".cursor-plugin/plugin.json",
         "bin/cadence-code-mcp-bootstrap",
+        "mcp.json",
         "mcp_config.json",
         "plugin.json",
         "commands/jump-in.md",
@@ -125,6 +177,7 @@ def main() -> int:
         "skills/jump-in/agents/openai.yaml",
         "skills/start-talking/SKILL.md",
         "skills/start-talking/agents/openai.yaml",
+        "skills/start-talking/scripts/setup",
         "skills/voice-settings/SKILL.md",
         "skills/voice-settings/agents/openai.yaml",
         "skills/wrap-up/SKILL.md",

@@ -1,6 +1,7 @@
 ---
 name: voice-settings
-description: Choose Cadence Code's local speech and transcription models from the Codex or Antigravity UI. Use only when the user explicitly invokes $voice-settings, /voice-settings, or asks to open Cadence Code settings.
+description: Choose Cadence Code's local speech and transcription models from the Codex, Cursor, or Antigravity UI. Use only when the user explicitly invokes $voice-settings, /voice-settings, or asks to open Cadence Code settings.
+disable-model-invocation: true
 ---
 
 # Cadence Code Settings
@@ -8,8 +9,8 @@ description: Choose Cadence Code's local speech and transcription models from th
 Use `mcp__cadence-code__voice_status`, `mcp__cadence-code__voice_models`,
 `mcp__cadence-code__voice_configure`, and `mcp__cadence-code__voice_stop` to
 change the saved speech-model pair. This workflow is configuration only: do not
-start a voice conversation or use the microphone. Antigravity may display these
-as the corresponding tools under the `cadence-code` MCP server.
+start a voice conversation or use the microphone. Cursor and Antigravity may
+display these as the corresponding tools under the `cadence-code` MCP server.
 
 1. Call `mcp__cadence-code__voice_status`.
 2. If `ready` is true, explain that a model change ends the current Cadence Code
