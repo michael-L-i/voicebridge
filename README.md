@@ -42,19 +42,28 @@ Start a new Codex session, then run `$start-talking` (or pick Start Talking from
 
 **Cursor 2.5+** (IDE and Agent CLI)
 
-```text
-/add-plugin cadence-code@https://github.com/michael-L-i/cadence-code
+Cursor's `/add-plugin` resolves names that are already listed on the Cursor
+Marketplace, so it cannot install this repository by URL. Register the
+repository as a marketplace first:
+
+```bash
+cursor-agent plugin marketplace add https://github.com/michael-L-i/cadence-code
 ```
 
-Start a new Cursor session, then run `/start-talking`.
+Restart Cursor, run `/plugin`, open the Marketplace tab, and install Cadence
+Code. Start a new session, then run `/start-talking`. On recent builds the CLI
+is installed as `agent` rather than `cursor-agent`.
 
 **Google Antigravity** (AGY CLI and IDE)
 
 ```bash
-agy plugin install https://github.com/michael-L-i/cadence-code
+git clone https://github.com/michael-L-i/cadence-code
+agy plugin install ./cadence-code
 ```
 
-Start a new AGY or Antigravity IDE session, then run `/start-talking`.
+Start a new AGY or Antigravity IDE session, then run `/start-talking`. If your
+AGY build accepts a repository URL, `agy plugin install
+https://github.com/michael-L-i/cadence-code` does the same thing in one step.
 
 On first run Cadence Code shows a quick orientation, starts with Pocket TTS and
 Parakeet 110M, requests microphone access, and downloads both models
@@ -74,7 +83,7 @@ the one-time dependency setup. Claude Code then asks you to run
 Talking again afterward.
 
 To update Codex or Claude Code, refresh and update through that host's plugin
-commands. In Cursor, manage the direct GitHub plugin from
+commands. In Cursor, manage the marketplace and its plugin from
 **Cursor Settings > Plugins**. For Antigravity, uninstall and re-run the install
 command above. Fully restart the host afterward — an already-running MCP
 process isn't replaced in place.

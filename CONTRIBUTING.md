@@ -33,6 +33,16 @@ uv run --locked python scripts/validate_plugin.py
 uv run --locked cadence-code doctor
 ```
 
+Per-host plugin and MCP manifests are generated, not hand-written. Their single
+source of truth is `scripts/host_manifests.py`. After changing it, run:
+
+```bash
+uv run --locked python scripts/generate_manifests.py
+```
+
+`validate_plugin.py` fails with a diff if any committed manifest drifts from
+that source, so CI catches a hand-edited JSON file.
+
 The first real voice session can download several speech-model files. Unit
 tests do not load the models or access the microphone.
 
@@ -102,6 +112,19 @@ Then invoke `/start-talking`, `/voice-settings`, `/jump-in`, or `/wrap-up`.
 Nothing is installed globally and no user-level Cursor configuration is
 changed. Use `./dev cursor --fresh` to repeat first-run setup without rebuilding
 the development venv.
+
+That workspace path does not cover the manifest users actually install. Cursor
+does not document a plugin-root placeholder for MCP manifests, so before
+shipping a Cursor change, also run:
+
+```bash
+./dev cursor --plugin
+```
+
+This loads `.cursor-plugin/plugin.json` and the root `mcp.json` through
+`--plugin-dir` with `CADENCE_CODE_HOST` unset, which is the only local check
+that the shipped manifest resolves the bootstrap on its own. Confirm
+`voice_status` reports `host: "cursor"`.
 
 Antigravity CLI uses the checkout's native workspace MCP configuration and the
 same Agent Skills:

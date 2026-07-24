@@ -20,9 +20,13 @@ Code, or `/start-talking` in Cursor and Antigravity:
 - On a new install, the host calls `voice_models`, shows the fixed first-run
   orientation, and persists its returned Pocket TTS and Parakeet 110M defaults
   through `voice_configure` without pausing for model selection.
-- The host calls `voice_start`, which preflights audio access, loads the selected
-  TTS and STT models in the MCP process, then speaks a greeting via
-  `voice_speak`.
+- The host calls `voice_start`, which preflights audio access and returns
+  immediately, loading the selected TTS and STT models on a background thread.
+  The host polls `voice_status` until `ready` is true, then speaks a greeting
+  via `voice_speak`. This is deliberately the same in every host: a first-run
+  model download can take minutes, and the MCP tool-deadline field is the least
+  documented and least portable part of every host's manifest spec, so no host
+  is allowed to depend on one. Pass `wait: true` to block instead.
 - The host calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
 - After interrupting a host turn with Escape, the user can invoke the explicit
@@ -50,6 +54,11 @@ This repo is the plugin and its own marketplace where the host uses one. Users
 install it through the host's plugin mechanism; there is no manual MCP
 configuration.
 
+**Every manifest below is generated. Do not hand-edit one.** They come from
+`scripts/host_manifests.py`, are written by `scripts/generate_manifests.py`, and
+`scripts/validate_plugin.py` fails with a diff if a file drifts from its source.
+Adding a host means adding one `host_*` function there, not five JSON files.
+
 - `.claude-plugin/plugin.json`: plugin manifest and MCP server declaration.
 - `.claude-plugin/marketplace.json`: lets this repo be added as its own
   Claude Code marketplace.
@@ -61,14 +70,25 @@ configuration.
 - `.cursor-plugin/plugin.json`: Cursor plugin manifest. It exposes the canonical
   Agent Skills and points at the root `mcp.json` without loading the
   Claude-specific command files.
-- `.cursor-plugin/marketplace.json`: lets the repository serve as a direct
-  GitHub Cursor plugin source.
-- `mcp.json`: installed Cursor stdio MCP declaration. It resolves the bootstrap
-  through `${CURSOR_PLUGIN_ROOT}` and identifies the host as `cursor`.
+- `.cursor-plugin/marketplace.json`: lets the repository be registered as a
+  Cursor marketplace. Cursor's `/add-plugin` only resolves names already listed
+  on the Cursor Marketplace, so a URL install is not available.
+- `mcp.json`: installed Cursor stdio MCP declaration.
 - `plugin.json` / `mcp_config.json`: native Antigravity plugin manifest and
-  stdio MCP declaration, shared by AGY CLI and Antigravity IDE. The MCP command
-  sets `CADENCE_CODE_HOST` through `env` because AGY 1.1.6 accepts but does not
-  pass the documented stdio `env` object.
+  stdio MCP declaration, shared by AGY CLI and Antigravity IDE.
+
+  Both installed declarations run the bootstrap through a generated `bash -c`
+  launcher rather than a bare path, because neither host documents a
+  plugin-root placeholder for MCP manifests. The launcher tries the host's
+  placeholder (`${CURSOR_PLUGIN_ROOT}` / `${extensionPath}`), then `$PWD`, then
+  the host's known install directory, and exits on stderr if none resolve. A
+  host that does not substitute the placeholder leaves bash an unset variable,
+  which empties harmlessly; later candidates avoid `${...}` so a host that
+  substitutes every token cannot blank them. The launcher also exports
+  `CADENCE_CODE_HOST` itself, because AGY 1.1.6 accepts but does not pass the
+  documented stdio `env` object. Neither declaration sets `cwd`: an
+  unsubstituted placeholder there is a literal directory name and fails the
+  launch outright, and the bootstrap already resolves its own root.
 - `skills/start-talking/`, `skills/jump-in/`, `skills/wrap-up/`, and
   `skills/voice-settings/`: canonical Codex, Cursor, and Antigravity workflows.
 - `.agents/skills/`: relative symlinks to every canonical Agent Skill so direct
@@ -165,7 +185,10 @@ simpler.
 - For a local Cursor branch test, run `./dev cursor`, then send
   `/start-talking`. The launcher uses the checkout's `.cursor` MCP configuration
   and shared Agent Skills without installing a plugin or changing user
-  configuration.
+  configuration. To test the manifest users actually install -- including
+  whether Cursor expands the undocumented `${CURSOR_PLUGIN_ROOT}` -- run
+  `./dev cursor --plugin`, which loads the checkout through `--plugin-dir` with
+  `CADENCE_CODE_HOST` unset. Confirm `voice_status` reports `host: "cursor"`.
 - For a local Antigravity branch test, run `./dev agy`, then send
   `/start-talking`. The launcher uses the checkout's `.agents` MCP and skill
   configuration without installing a plugin or changing user configuration.

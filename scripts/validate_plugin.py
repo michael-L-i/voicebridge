@@ -1,20 +1,70 @@
 #!/usr/bin/env python3
-"""Validate repository-owned plugin contracts without loading speech models."""
+"""Validate repository-owned plugin contracts without loading speech models.
+
+Per-host manifest *fields* are not asserted here. They are generated from
+``scripts/host_manifests.py``, so this checks that the files on disk still match
+that source and then validates what generation cannot: the skill symlinks, the
+required file set, and the bash that actually launches the server.
+"""
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
+from generate_manifests import drift
+from host_manifests import ROOT, manifests, project_version
 
-ROOT = Path(__file__).resolve().parent.parent
+
+def validate_generated_manifests(failures: list[str]) -> None:
+    """Fail when a manifest was hand-edited instead of regenerated."""
+    diffs = drift()
+    for diff in diffs:
+        print(diff, end="", file=sys.stderr)
+    if diffs:
+        failures.append(
+            f"{len(diffs)} manifest(s) drifted from scripts/host_manifests.py; "
+            "run: python scripts/generate_manifests.py"
+        )
 
 
-def load_json(relative_path: str) -> dict:
-    return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+def validate_launcher_programs(failures: list[str]) -> None:
+    """Check every generated ``bash -c`` launcher for syntax and stdout purity.
+
+    These programs are the first thing a host executes. A syntax error or a
+    stray stdout write corrupts the MCP JSON-RPC handshake, and neither failure
+    is visible until a real host session dies.
+    """
+    for relative_path, manifest in sorted(manifests().items()):
+        # Cursor's plugin.json points at a sibling file rather than inlining.
+        servers = manifest.get("mcpServers", {})
+        if not isinstance(servers, dict):
+            continue
+        for name, server in servers.items():
+            if not isinstance(server, dict):
+                continue
+            arguments = server.get("args") or []
+            if server.get("command") != "bash" or arguments[:1] != ["-c"]:
+                continue
+            program = arguments[1]
+            syntax = subprocess.run(
+                ["bash", "-n", "-c", program],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if syntax.returncode:
+                failures.append(
+                    f"{relative_path}: {name} launcher is invalid bash: "
+                    f"{syntax.stderr.strip()}"
+                )
+            for statement in program.split("; "):
+                if statement.startswith("echo ") and ">&2" not in statement:
+                    failures.append(
+                        f"{relative_path}: {name} launcher writes to stdout, "
+                        f"which corrupts the MCP channel: {statement}"
+                    )
 
 
 def validate_development_skills(failures: list[str]) -> None:
@@ -43,130 +93,20 @@ def validate_development_skills(failures: list[str]) -> None:
             )
 
 
-def validate_antigravity_development_mcp(failures: list[str]) -> None:
-    server = load_json(".agents/mcp_config.json").get("mcpServers", {}).get(
-        "cadence-code", {}
-    )
-    if server.get("command") != "env":
-        failures.append("Antigravity development MCP must launch through env")
-    if server.get("args") != [
-        "CADENCE_CODE_HOST=antigravity",
-        "bash",
-        "./bin/cadence-code-mcp-bootstrap",
-    ]:
-        failures.append("Antigravity development MCP must use the checkout bootstrap")
-    if server.get("cwd") != ".":
-        failures.append("Antigravity development MCP must run from the checkout root")
-    if server.get("timeoutSeconds") != 1800:
-        failures.append("Antigravity development MCP must allow long model setup")
-
-
-def validate_cursor_development_mcp(failures: list[str]) -> None:
-    server = load_json(".cursor/mcp.json").get("mcpServers", {}).get(
-        "cadence-code", {}
-    )
-    if server.get("command") != "bash":
-        failures.append("Cursor development MCP must launch through bash")
-    if server.get("args") != [
-        "${workspaceFolder}/bin/cadence-code-mcp-bootstrap"
-    ]:
-        failures.append("Cursor development MCP must use the checkout bootstrap")
-    if server.get("cwd") != "${workspaceFolder}":
-        failures.append("Cursor development MCP must run from the checkout root")
-    if server.get("env", {}).get("CADENCE_CODE_HOST") != "cursor":
-        failures.append("Cursor development MCP must preserve its host identity")
-
-
 def main() -> int:
-    with (ROOT / "pyproject.toml").open("rb") as file:
-        project = tomllib.load(file)["project"]
-
-    claude = load_json(".claude-plugin/plugin.json")
-    codex = load_json(".codex-plugin/plugin.json")
-    cursor = load_json(".cursor-plugin/plugin.json")
-    cursor_marketplace = load_json(".cursor-plugin/marketplace.json")
-    cursor_mcp = load_json("mcp.json")
-    antigravity = load_json("plugin.json")
-    antigravity_mcp = load_json("mcp_config.json")
-    version = project["version"]
-
+    version = project_version()
     failures: list[str] = []
-    if (
-        claude.get("version") != version
-        or codex.get("version") != version
-        or cursor.get("version") != version
-    ):
-        failures.append("plugin manifest versions must match pyproject.toml")
-    if claude.get("mcpServers", {}).get("cadence-code", {}).get("command") != (
-        "${CLAUDE_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
-    ):
-        failures.append("Claude Code must use the repository bootstrap")
-    codex_server = codex.get("mcpServers", {}).get("cadence-code", {})
-    if codex_server.get("command") != "bash":
-        failures.append("Codex MCP server must launch through bash")
-    if codex_server.get("args") != ["./bin/cadence-code-mcp-bootstrap"]:
-        failures.append("Codex MCP server must use the repository bootstrap")
+
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
-    if cursor.get("name") != "cadence-code":
-        failures.append("Cursor plugin name must be cadence-code")
-    if cursor.get("skills") != "./skills/":
-        failures.append("Cursor plugin must bundle the canonical skills")
-    if cursor.get("commands") != []:
-        failures.append("Cursor plugin must not load Claude-specific commands")
-    if cursor.get("mcpServers") != "./mcp.json":
-        failures.append("Cursor plugin must use its root MCP configuration")
-    cursor_entry = (cursor_marketplace.get("plugins") or [{}])[0]
-    if cursor_entry.get("name") != "cadence-code":
-        failures.append("Cursor marketplace must list cadence-code")
-    if cursor_entry.get("source") != "./":
-        failures.append("Cursor marketplace must point at the repository root")
-    cursor_server = cursor_mcp.get("mcpServers", {}).get("cadence-code", {})
-    if cursor_server.get("command") != "bash":
-        failures.append("Cursor MCP server must launch through bash")
-    if cursor_server.get("args") != [
-        "${CURSOR_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
-    ]:
-        failures.append("Cursor MCP server must use the installed bootstrap")
-    if cursor_server.get("cwd") != "${CURSOR_PLUGIN_ROOT}":
-        failures.append("Cursor MCP server must run from its plugin root")
-    if cursor_server.get("env", {}).get("CADENCE_CODE_HOST") != "cursor":
-        failures.append("Cursor MCP server must preserve its host identity")
-    if antigravity.get("$schema") != (
-        "https://antigravity.google/schemas/v1/plugin.json"
-    ):
-        failures.append("Antigravity plugin must use the official schema")
-    if antigravity.get("name") != "cadence-code":
-        failures.append("Antigravity plugin name must be cadence-code")
-    antigravity_server = antigravity_mcp.get("mcpServers", {}).get(
-        "cadence-code", {}
-    )
-    if antigravity_server.get("command") != "env":
-        failures.append("Antigravity MCP server must launch through env")
-    if antigravity_server.get("args") != [
-        "CADENCE_CODE_HOST=antigravity",
-        "bash",
-        "${extensionPath}/bin/cadence-code-mcp-bootstrap"
-    ]:
-        failures.append("Antigravity MCP server must use the installed bootstrap")
-    if antigravity_server.get("cwd") != "${extensionPath}":
-        failures.append("Antigravity MCP server must run from its plugin root")
-    if antigravity_server.get("timeoutSeconds") != 1800:
-        failures.append("Antigravity MCP server must allow long model setup")
 
+    validate_generated_manifests(failures)
+    validate_launcher_programs(failures)
     validate_development_skills(failures)
-    validate_cursor_development_mcp(failures)
-    validate_antigravity_development_mcp(failures)
 
     required_paths = [
-        ".agents/mcp_config.json",
-        ".cursor/mcp.json",
-        ".cursor-plugin/marketplace.json",
-        ".cursor-plugin/plugin.json",
+        *sorted(manifests()),
         "bin/cadence-code-mcp-bootstrap",
-        "mcp.json",
-        "mcp_config.json",
-        "plugin.json",
         "commands/jump-in.md",
         "commands/start-talking.md",
         "commands/voice-settings.md",

@@ -71,10 +71,15 @@ Use two distinct outputs for each completed request:
    Existing users with `first_run: false` skip the fixed script and automatic
    default configuration silently: say nothing about the check or the skip,
    and proceed straight to step 2.
-2. Call `voice_start` and wait for the audio preflight and local speech
-   models to load. If it returns `ok: false`, show the error to the user and end
-   without retrying. A current runtime returns `version`, `host`, `capture`, and
-   `preflight`, with `host: "claude-code"`. If a field is absent or the host is
+2. Call `voice_start`, then poll `voice_status` until `ready` is true.
+   `voice_start` returns as soon as the audio preflight passes and loads the
+   speech models in the background, so a first-run model download can never
+   outlive the MCP tool deadline. While `starting` is true, wait between polls
+   rather than narrating or starting other work, and do not call `voice_speak`
+   or `voice_listen` until `ready` is true. If `start_error` is set or a call
+   returns `ok: false`, show the error to the user and end without retrying. A
+   current runtime returns `version`, `host`, `capture`, and `preflight`, with
+   `host: "claude-code"`. If a field is absent or the host is
    wrong, the MCP process survived a plugin update or is misconfigured: call
    `voice_stop`, tell the user to fully exit every Claude Code session using
    Cadence Code and relaunch Claude Code, then end without starting a voice loop.

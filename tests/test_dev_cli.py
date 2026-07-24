@@ -269,6 +269,46 @@ class DevCliTests(unittest.TestCase):
         self.assertIn("arg=--model", arguments)
         self.assertIn("arg=test-model", arguments)
 
+    def test_cursor_plugin_mode_exercises_the_installed_manifest(self):
+        """--plugin is the only local check of the shipped Cursor manifest.
+
+        ${CURSOR_PLUGIN_ROOT} is undocumented, so the workspace .cursor/mcp.json
+        path cannot prove the installed mcp.json resolves. This mode must load
+        the checkout through --plugin-dir and must not pre-set the host, or a
+        broken manifest would be masked by the launcher's own environment.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake_cursor = temp / "agent"
+            fake_cursor.write_text(
+                "#!/bin/bash\n"
+                "printf 'host=%s\\n' \"${CADENCE_CODE_HOST-unset}\"\n"
+                "printf 'arg=%s\\n' \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_cursor.chmod(0o755)
+            data_root = temp / "data"
+            env = {
+                **os.environ,
+                "CADENCE_CODE_DEV_CURSOR_BIN": str(fake_cursor),
+                "CADENCE_CODE_DEV_DATA_ROOT": str(data_root),
+            }
+            env.pop("CADENCE_CODE_HOST", None)
+
+            result = subprocess.run(
+                [DEV, "cursor", "--plugin"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        arguments = result.stdout.splitlines()
+        self.assertIn("arg=--plugin-dir", arguments)
+        self.assertIn(f"arg={ROOT}", arguments)
+        self.assertIn("host=unset", arguments)
+        self.assertNotIn("arg=--plugin", arguments)
+
     def test_cursor_workspace_mcp_uses_checkout_bootstrap(self):
         server = json.loads(
             (ROOT / ".cursor/mcp.json").read_text(encoding="utf-8")
@@ -358,15 +398,13 @@ class DevCliTests(unittest.TestCase):
             (ROOT / ".agents/mcp_config.json").read_text(encoding="utf-8")
         )["mcpServers"]["cadence-code"]
 
-        self.assertEqual(server["command"], "env")
-        self.assertEqual(
-            server["args"],
-            [
-                "CADENCE_CODE_HOST=antigravity",
-                "bash",
-                "./bin/cadence-code-mcp-bootstrap",
-            ],
-        )
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"][0], "-c")
+        # AGY 1.1.6 accepts but does not pass the documented stdio env object,
+        # so the launcher exports the host identity itself.
+        self.assertIn("export CADENCE_CODE_HOST=antigravity", server["args"][1])
+        self.assertIn("bin/cadence-code-mcp-bootstrap", server["args"][1])
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "antigravity")
         self.assertEqual(server["cwd"], ".")
         self.assertEqual(server["timeoutSeconds"], 1800)
 

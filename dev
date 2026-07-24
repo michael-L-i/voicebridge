@@ -63,13 +63,19 @@ EOF
 
 cursor_help() {
   cat <<'EOF'
-Usage: ./dev cursor [--fresh] [cursor-agent-options]
+Usage: ./dev cursor [--fresh] [--plugin] [cursor-agent-options]
 
 Launch Cursor Agent from the repository root. The checkout's workspace MCP
 configuration and shared Agent Skills load directly; no plugin is installed and
 no user Cursor configuration is changed. Inside Cursor, run /start-talking.
 Use --fresh to clear the development configuration and onboarding marker while
 keeping the private venv.
+
+Use --plugin to load the checkout through --plugin-dir instead, which exercises
+the installed-plugin path: .cursor-plugin/plugin.json and the root mcp.json,
+including whether Cursor expands ${CURSOR_PLUGIN_ROOT}. That placeholder is
+undocumented, so this is the only local check that the shipped manifest
+resolves. The workspace .cursor/mcp.json is bypassed.
 EOF
 }
 
@@ -329,11 +335,15 @@ run_cursor() {
   fi
 
   local fresh=0
+  local plugin=0
   local -a cursor_args=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --fresh)
         fresh=1
+        ;;
+      --plugin)
+        plugin=1
         ;;
       *)
         cursor_args+=("$1")
@@ -356,11 +366,23 @@ run_cursor() {
   fi
   cd "${REPO_ROOT}"
   export CADENCE_CODE_DATA_DIR="${data_dir}"
-  export CADENCE_CODE_HOST="cursor"
-  if [ "${#cursor_args[@]}" -eq 0 ]; then
-    exec "${cursor_bin}" --workspace "${REPO_ROOT}"
+
+  local -a cursor_config=(--workspace "${REPO_ROOT}")
+  if [ "${plugin}" = "1" ]; then
+    # Load the shipped plugin manifest instead of the workspace MCP file, and
+    # leave CADENCE_CODE_HOST unset so the run proves the manifest itself
+    # establishes host identity and resolves the bootstrap.
+    cursor_config+=(--plugin-dir "${REPO_ROOT}")
+    unset CADENCE_CODE_HOST
+    echo "[cadence-code-dev] loading the installed Cursor plugin path" >&2
+  else
+    export CADENCE_CODE_HOST="cursor"
   fi
-  exec "${cursor_bin}" --workspace "${REPO_ROOT}" "${cursor_args[@]}"
+
+  if [ "${#cursor_args[@]}" -eq 0 ]; then
+    exec "${cursor_bin}" "${cursor_config[@]}"
+  fi
+  exec "${cursor_bin}" "${cursor_config[@]}" "${cursor_args[@]}"
 }
 
 run_agy() {

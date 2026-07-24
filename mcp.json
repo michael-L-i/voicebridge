@@ -3,9 +3,9 @@
     "cadence-code": {
       "command": "bash",
       "args": [
-        "${CURSOR_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
+        "-c",
+        "export CADENCE_CODE_HOST=cursor; for root in \"${CURSOR_PLUGIN_ROOT}\" \"$PWD\" \"$HOME/.cursor/plugins/cadence-code\"; do bootstrap=\"$root/bin/cadence-code-mcp-bootstrap\"; if [ -x \"$bootstrap\" ]; then exec bash \"$bootstrap\"; fi; done; echo \"[cadence-code] ERROR: could not locate bin/cadence-code-mcp-bootstrap.\" >&2; exit 1"
       ],
-      "cwd": "${CURSOR_PLUGIN_ROOT}",
       "env": {
         "CADENCE_CODE_HOST": "cursor"
       }

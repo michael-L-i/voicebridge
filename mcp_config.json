@@ -1,13 +1,14 @@
 {
   "mcpServers": {
     "cadence-code": {
-      "command": "env",
+      "command": "bash",
       "args": [
-        "CADENCE_CODE_HOST=antigravity",
-        "bash",
-        "${extensionPath}/bin/cadence-code-mcp-bootstrap"
+        "-c",
+        "export CADENCE_CODE_HOST=antigravity; for root in \"${extensionPath}\" \"$PWD\" \"$HOME/.gemini/antigravity-cli/plugins/cadence-code\"; do bootstrap=\"$root/bin/cadence-code-mcp-bootstrap\"; if [ -x \"$bootstrap\" ]; then exec bash \"$bootstrap\"; fi; done; echo \"[cadence-code] ERROR: could not locate bin/cadence-code-mcp-bootstrap.\" >&2; exit 1"
       ],
-      "cwd": "${extensionPath}",
+      "env": {
+        "CADENCE_CODE_HOST": "antigravity"
+      },
       "timeoutSeconds": 1800
     }
   }

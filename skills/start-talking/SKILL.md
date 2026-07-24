@@ -19,9 +19,11 @@ conversation and authors every word sent to speech.
 If the Cadence Code MCP tools are unavailable or still connecting, run the
 bundled `scripts/setup` skill script and wait for it to finish. Do not
 background it or retry it in parallel. On failure, show the error and end. On
-success, ask the user to restart Cursor or its Agent CLI and invoke
-`/start-talking` again, then end without attempting an MCP tool call. This
-fallback applies to Cursor only; other hosts keep their existing setup flow.
+success, ask the user to restart the host and invoke `/start-talking` again,
+then end without attempting an MCP tool call. This fallback applies to Cursor
+and Antigravity, neither of which documents a server startup timeout long
+enough to build the private venv on first run. Codex declares
+`startup_timeout_sec` and keeps its existing setup flow.
 
 Maintain two outputs for completed work:
 
@@ -70,13 +72,15 @@ Maintain two outputs for completed work:
    configuration fails, show the error and end without calling `voice_start`.
    Existing users with `first_run: false` skip the fixed script and automatic
    default configuration silently.
-2. In Cursor, call `voice_start` with `wait: false`, then poll `voice_status`
-   until `ready` is true. While `starting` is true, wait between polls; do not
-   narrate or start other work. If `start_error` is set, show it and end without
-   retrying. In Codex or Antigravity, call `voice_start` normally and wait for
-   the audio preflight and local speech models. Do not call any Cadence Code
-   audio tool before this explicit skill invocation. If either start path
-   returns `ok: false`, show the error and end without retrying.
+2. Call `voice_start`, then poll `voice_status` until `ready` is true. This is
+   the same in every host: `voice_start` returns as soon as the audio preflight
+   passes and loads the speech models in the background, so a first-run model
+   download can never outlive the host's MCP tool deadline. While `starting` is
+   true, wait between polls; do not narrate or start other work. If
+   `start_error` is set, show it and end without retrying. Do not call any
+   Cadence Code audio tool before this explicit skill invocation, and do not
+   call `voice_speak` or `voice_listen` until `ready` is true. If `voice_start`
+   or a poll returns `ok: false`, show the error and end without retrying.
 3. Verify the completed start result or final status includes `version`, `host`,
    `capture`, and `preflight`.
    The host must be `codex` when invoked from Codex, `cursor` when invoked from
