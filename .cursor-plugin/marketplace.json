@@ -1,0 +1,16 @@
+{
+  "name": "cadence-code-marketplace",
+  "owner": {
+    "name": "Michael Li"
+  },
+  "metadata": {
+    "description": "Marketplace for fully local Cadence Code voice conversations."
+  },
+  "plugins": [
+    {
+      "name": "cadence-code",
+      "source": "./",
+      "description": "Fully local voice conversations for Cursor on Apple Silicon."
+    }
+  ]
+}

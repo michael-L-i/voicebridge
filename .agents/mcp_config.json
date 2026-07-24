@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "cadence-code": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "export CADENCE_CODE_HOST=antigravity; for root in \"$PWD\"; do bootstrap=\"$root/bin/cadence-code-mcp-bootstrap\"; if [ -x \"$bootstrap\" ]; then exec bash \"$bootstrap\"; fi; done; echo \"[cadence-code] ERROR: could not locate bin/cadence-code-mcp-bootstrap.\" >&2; exit 1"
+      ],
+      "cwd": ".",
+      "env": {
+        "CADENCE_CODE_HOST": "antigravity"
+      },
+      "timeoutSeconds": 1800
+    }
+  }
+}

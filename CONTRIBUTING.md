@@ -33,6 +33,16 @@ uv run --locked python scripts/validate_plugin.py
 uv run --locked cadence-code doctor
 ```
 
+Per-host plugin and MCP manifests are generated, not hand-written. Their single
+source of truth is `scripts/host_manifests.py`. After changing it, run:
+
+```bash
+uv run --locked python scripts/generate_manifests.py
+```
+
+`validate_plugin.py` fails with a diff if any committed manifest drifts from
+that source, so CI catches a hand-edited JSON file.
+
 The first real voice session can download several speech-model files. Unit
 tests do not load the models or access the microphone.
 
@@ -49,7 +59,7 @@ uv export --locked --no-dev --no-emit-project --no-annotate --no-header \
 Run `uv lock --check` before opening a pull request. CI also verifies that the
 committed export still exactly matches `uv.lock`.
 
-To inspect the checkout's MCP tools without installing either host plugin, run:
+To inspect the checkout's MCP tools without installing a host plugin, run:
 
 ```bash
 ./dev inspector
@@ -91,8 +101,46 @@ user-level Codex configuration is changed.
 Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.
 
+Cursor Agent can load the checkout's workspace MCP configuration and shared
+Agent Skills without installing the plugin:
+
+```bash
+./dev cursor
+```
+
+Then invoke `/start-talking`, `/voice-settings`, `/jump-in`, or `/wrap-up`.
+Nothing is installed globally and no user-level Cursor configuration is
+changed. Use `./dev cursor --fresh` to repeat first-run setup without rebuilding
+the development venv.
+
+That workspace path does not cover the manifest users actually install. Cursor
+does not document a plugin-root placeholder for MCP manifests, so before
+shipping a Cursor change, also run:
+
+```bash
+./dev cursor --plugin
+```
+
+This loads `.cursor-plugin/plugin.json` and the root `mcp.json` through
+`--plugin-dir` with `CADENCE_CODE_HOST` unset, which is the only local check
+that the shipped manifest resolves the bootstrap on its own. Confirm
+`voice_status` reports `host: "cursor"`.
+
+Antigravity CLI uses the checkout's native workspace MCP configuration and the
+same Agent Skills:
+
+```bash
+./dev agy
+```
+
+Then invoke `/start-talking`, `/voice-settings`, `/jump-in`, or `/wrap-up`.
+Nothing is installed globally and no user-level Antigravity configuration is
+changed. Use `./dev agy --fresh` to repeat first-run setup without rebuilding
+the development venv.
+
 When you need to discard every local-development venv and configuration, first
-close Claude Code, Codex, and MCP Inspector sessions using Cadence Code, then run:
+close Claude Code, Codex, Cursor, Antigravity, and MCP Inspector sessions using
+Cadence Code, then run:
 
 ```bash
 ./dev reset
@@ -120,7 +168,7 @@ cadence-code listen-test
 
 A full voice-mode change should be exercised through
 `voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop` in a
-real Claude Code session. Note what you tested in the pull request; do not
+real supported host session. Note what you tested in the pull request; do not
 attach recordings unless everyone captured in them has consented.
 
 ## Pull requests

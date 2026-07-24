@@ -30,7 +30,11 @@ class MCPStdioTests(unittest.TestCase):
                 "jsonrpc": "2.0",
                 "id": 2,
                 "method": "tools/call",
-                "params": {"name": "voice_start", "arguments": {}},
+                # voice_start is non-blocking by default so no host's tool
+                # deadline can expire during a first-run model download. Wait
+                # here so the load deterministically finishes inside this
+                # process and its output can be checked against stdout.
+                "params": {"name": "voice_start", "arguments": {"wait": True}},
             },
         ]
         result = subprocess.run(

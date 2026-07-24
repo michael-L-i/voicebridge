@@ -1,6 +1,7 @@
 ---
 name: wrap-up
-description: End an active Cadence Code conversation cleanly and release its local speech models. Use only when the user explicitly invokes $wrap-up or asks to wrap up the voice conversation.
+description: End an active Cadence Code conversation cleanly and release its local speech models. Use only when the user explicitly invokes $wrap-up, /wrap-up, or asks to wrap up the voice conversation.
+disable-model-invocation: true
 ---
 
 # Wrap Up
@@ -8,6 +9,8 @@ description: End an active Cadence Code conversation cleanly and release its loc
 Use `mcp__cadence-code__voice_status`,
 `mcp__cadence-code__voice_speak`, and
 `mcp__cadence-code__voice_stop` to end the current conversation.
+Cursor and Antigravity may display these as the corresponding `voice_status`,
+`voice_speak`, and `voice_stop` tools under the `cadence-code` MCP server.
 
 1. Call `mcp__cadence-code__voice_status`.
 2. If `ready` is false, say there is no active Cadence Code conversation to

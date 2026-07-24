@@ -2,10 +2,11 @@
 
 ## Project Overview
 
-`cadence-code` is a Codex and Claude Code plugin: a fully local voice companion
-for Apple Silicon. Its stdio MCP process owns local TTS and STT models directly
-while a voice conversation is active. There is no HTTP daemon or local
-summarization model; the host coding agent provides the exact text sent to TTS.
+`cadence-code` is a Codex, Claude Code, Cursor, and Google Antigravity plugin: a
+fully local voice companion for Apple Silicon. Its stdio MCP process owns local
+TTS and STT models directly while a voice conversation is active. There is no
+HTTP daemon or local summarization model; the host coding agent provides the
+exact text sent to TTS.
 
 MLX is the speech inference backend, not a second reasoning layer. Speech
 models run through `mlx-audio`; some TTS implementations reuse `mlx-lm` cache
@@ -13,15 +14,19 @@ and sampling utilities internally, but Cadence Code never loads a local
 reasoning or summarization model.
 
 There is no passive narration. Users explicitly choose Start Talking with
-`$start-talking` or `/skills` in Codex, or `/cadence-code:start-talking` in
-Claude Code:
+`$start-talking` or `/skills` in Codex, `/cadence-code:start-talking` in Claude
+Code, or `/start-talking` in Cursor and Antigravity:
 
 - On a new install, the host calls `voice_models`, shows the fixed first-run
   orientation, and persists its returned Pocket TTS and Parakeet 110M defaults
   through `voice_configure` without pausing for model selection.
-- The host calls `voice_start`, which preflights audio access, loads the selected
-  TTS and STT models in the MCP process, then speaks a greeting via
-  `voice_speak`.
+- The host calls `voice_start`, which preflights audio access and returns
+  immediately, loading the selected TTS and STT models on a background thread.
+  The host polls `voice_status` until `ready` is true, then speaks a greeting
+  via `voice_speak`. This is deliberately the same in every host: a first-run
+  model download can take minutes, and the MCP tool-deadline field is the least
+  documented and least portable part of every host's manifest spec, so no host
+  is allowed to depend on one. Pass `wait: true` to block instead.
 - The host calls `voice_listen` to capture the user's reply via the mic, then
   acts on the transcript with its normal tools -- silently, no play-by-play.
 - After interrupting a host turn with Escape, the user can invoke the explicit
@@ -33,8 +38,9 @@ Claude Code:
 - At that point the host calls `voice_stop`, which drops both providers, clears
   the MLX cache, and releases the active-session lock. If the host session ends
   unexpectedly, MCP process exit releases its memory and lock.
-- The explicit `$wrap-up` or `/cadence-code:wrap-up` workflow gives the same
-  clean ending on demand, allowing a short goodbye to finish before release.
+- The explicit `$wrap-up`, `/cadence-code:wrap-up`, or `/wrap-up` workflow gives
+  the same clean ending on demand, allowing a short goodbye to finish before
+  release.
 
 The MCP process itself is lightweight until voice mode starts. Models remain
 warm between turns, then are released when the conversation stops.
@@ -44,8 +50,14 @@ The package supports Python 3.11 through 3.14 and is configured by
 
 ## Plugin Layout
 
-This repo is the plugin and its own marketplace for both hosts. Users install it
-through the host's plugin mechanism; there is no manual MCP configuration.
+This repo is the plugin and its own marketplace where the host uses one. Users
+install it through the host's plugin mechanism; there is no manual MCP
+configuration.
+
+**Every manifest below is generated. Do not hand-edit one.** They come from
+`scripts/host_manifests.py`, are written by `scripts/generate_manifests.py`, and
+`scripts/validate_plugin.py` fails with a diff if a file drifts from its source.
+Adding a host means adding one `host_*` function there, not five JSON files.
 
 - `.claude-plugin/plugin.json`: plugin manifest and MCP server declaration.
 - `.claude-plugin/marketplace.json`: lets this repo be added as its own
@@ -55,28 +67,56 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   prevents Claude Code from also discovering it as a project MCP server during
   direct-checkout development.
 - `.agents/plugins/marketplace.json`: Codex marketplace metadata for this repo.
+- `.cursor-plugin/plugin.json`: Cursor plugin manifest. It exposes the canonical
+  Agent Skills and points at the root `mcp.json` without loading the
+  Claude-specific command files.
+- `.cursor-plugin/marketplace.json`: lets the repository be registered as a
+  Cursor marketplace. Cursor's `/add-plugin` only resolves names already listed
+  on the Cursor Marketplace, so a URL install is not available.
+- `mcp.json`: installed Cursor stdio MCP declaration.
+- `plugin.json` / `mcp_config.json`: native Antigravity plugin manifest and
+  stdio MCP declaration, shared by AGY CLI and Antigravity IDE.
+
+  Both installed declarations run the bootstrap through a generated `bash -c`
+  launcher rather than a bare path, because neither host documents a
+  plugin-root placeholder for MCP manifests. The launcher tries the host's
+  placeholder (`${CURSOR_PLUGIN_ROOT}` / `${extensionPath}`), then `$PWD`, then
+  the host's known install directory, and exits on stderr if none resolve. A
+  host that does not substitute the placeholder leaves bash an unset variable,
+  which empties harmlessly; later candidates avoid `${...}` so a host that
+  substitutes every token cannot blank them. The launcher also exports
+  `CADENCE_CODE_HOST` itself, because AGY 1.1.6 accepts but does not pass the
+  documented stdio `env` object. Neither declaration sets `cwd`: an
+  unsubstituted placeholder there is a literal directory name and fails the
+  launch outright, and the bootstrap already resolves its own root.
 - `skills/start-talking/`, `skills/jump-in/`, `skills/wrap-up/`, and
-  `skills/voice-settings/`: canonical Codex workflows.
-- `.agents/skills/`: relative symlinks to every canonical Codex skill so direct
-  checkouts expose the same workflows as installed plugins.
+  `skills/voice-settings/`: canonical Codex, Cursor, and Antigravity workflows.
+- `.agents/skills/`: relative symlinks to every canonical Agent Skill so direct
+  Codex, Cursor, and Antigravity checkouts expose the installed workflows.
+- `.cursor/mcp.json`: Cursor workspace MCP declaration used by `./dev cursor`
+  without installing the plugin.
+- `.agents/mcp_config.json`: Antigravity workspace MCP declaration used by
+  `./dev agy` without installing the plugin.
 - `bin/cadence-code-mcp-bootstrap`: a pure-bash wrapper. Builds a private venv
   under `CADENCE_CODE_DATA_DIR` on first run (or after a dependency change),
   then `exec`s into the real `cadence-code-mcp` entrypoint inside it. Claude Code
-  points that variable at its plugin data directory; Codex uses `~/.cadence-code`.
+  points that variable at its plugin data directory; Codex, Cursor, and
+  Antigravity use `~/.cadence-code`.
   Every log line in this script goes to stderr only -- stdout is the live MCP
   JSON-RPC channel, and any stray stdout output corrupts the protocol
   handshake.
-- `commands/start-talking.md`, `commands/jump-in.md`, and
-  `commands/wrap-up.md`: the corresponding Claude Code slash commands,
-  namespaced to the plugin automatically.
+- `commands/start-talking.md`, `commands/jump-in.md`,
+  `commands/voice-settings.md`, and `commands/wrap-up.md`: the corresponding
+  Claude Code slash commands, namespaced to the plugin automatically.
 
 ## Important Paths
 
 - `cadence_code/cli.py`: Click CLI with `doctor` and `listen-test` for direct
   development. The plugin path invokes the MCP bootstrap instead.
 - `cadence_code/config.py`: Pydantic config models. `CONFIG_DIR` reads the
-  `CADENCE_CODE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the plugin
-  manifest, falling back to `~/.cadence-code` for Codex and direct-Python dev).
+  `CADENCE_CODE_DATA_DIR` env var (set to `${CLAUDE_PLUGIN_DATA}` by the Claude
+  manifest, falling back to `~/.cadence-code` for Codex, Cursor, Antigravity,
+  and direct-Python dev).
   Existing configs are migrated away from the retired `[daemon]` and
   `[summarizer]` sections without replacing current voice or audio choices.
 - `config/default_config.toml`: default speech model and audio settings
@@ -100,8 +140,8 @@ through the host's plugin mechanism; there is no manual MCP configuration.
   `voice_configure`, `voice_start`, `voice_speak`, `voice_listen`,
   `voice_interrupt`, `voice_stop`, and `voice_status`.
 - `cadence_code/mcp/runtime.py`: owns warm model providers and the advisory
-  machine-wide session lock. Only one Cadence Code conversation across either
-  host can use the audio devices and model memory at a time. Status includes
+  machine-wide session lock. Only one Cadence Code conversation across any host
+  can use the audio devices and model memory at a time. Status includes
   host, first-run state, running version, and capture timing so stale
   post-update MCP processes are visible.
 
@@ -119,7 +159,8 @@ python -m unittest discover -s tests -v
 For behavioral changes, run the unit tests plus the narrowest relevant manual
 check, usually `cadence-code doctor`, `cadence-code listen-test`, or a direct
 `voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop`
-sequence through a real Codex or Claude Code MCP client session.
+sequence through a real Codex, Claude Code, Cursor, or Antigravity MCP client
+session.
 
 ## Visible Plugin Test Sessions
 
@@ -130,10 +171,10 @@ Start Talking on the user's behalf and leave the session open for hands-on
 audio testing; do not ask the user to type routine launch, install, or
 initialization commands.
 
-Support both Claude Code and Codex as first-class test hosts. If the user does
-not name a host, default to Claude Code. If the user names Codex, launch and
-initialize a Codex test tab instead; do not substitute Claude Code merely
-because its direct-checkout workflow is simpler.
+Support Claude Code, Codex, Cursor, and Antigravity as first-class test hosts.
+If the user does not name a host, default to Claude Code. Launch the named host
+rather than substituting another host because its direct-checkout workflow is
+simpler.
 
 - For a local Claude Code branch test, run `./dev claude`, then send
   `/cadence-code:start-talking`. This tests the checkout directly through
@@ -141,6 +182,16 @@ because its direct-checkout workflow is simpler.
 - For a local Codex branch test, run `./dev codex`, then send `$start-talking`.
   The launcher injects the checkout's MCP server for that process only and does
   not install a plugin or configure a marketplace.
+- For a local Cursor branch test, run `./dev cursor`, then send
+  `/start-talking`. The launcher uses the checkout's `.cursor` MCP configuration
+  and shared Agent Skills without installing a plugin or changing user
+  configuration. To test the manifest users actually install -- including
+  whether Cursor expands the undocumented `${CURSOR_PLUGIN_ROOT}` -- run
+  `./dev cursor --plugin`, which loads the checkout through `--plugin-dir` with
+  `CADENCE_CODE_HOST` unset. Confirm `voice_status` reports `host: "cursor"`.
+- For a local Antigravity branch test, run `./dev agy`, then send
+  `/start-talking`. The launcher uses the checkout's `.agents` MCP and skill
+  configuration without installing a plugin or changing user configuration.
 - For a GitHub release test, update/install the normal GitHub-backed plugin,
   verify the requested version and source, launch the host without a local
   plugin override, and invoke Start Talking.

@@ -1,12 +1,18 @@
 import ast
 import json
+import os
 import subprocess
+import sys
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from host_manifests import manifests as _manifests  # noqa: E402
 
 
 def _json(path: str):
@@ -19,15 +25,36 @@ class PluginContractTests(unittest.TestCase):
             project_version = tomllib.load(file)["project"]["version"]
         claude = _json(".claude-plugin/plugin.json")
         codex = _json(".codex-plugin/plugin.json")
+        cursor = _json(".cursor-plugin/plugin.json")
 
         self.assertEqual(project_version, "0.6.0")
         self.assertEqual(claude["version"], project_version)
         self.assertEqual(codex["version"], project_version)
+        self.assertEqual(cursor["version"], project_version)
         self.assertEqual(
             claude["mcpServers"]["cadence-code"]["env"]["CADENCE_CODE_HOST"],
             "claude-code",
         )
         self.assertEqual(codex["skills"], "./skills/")
+        self.assertEqual(cursor["skills"], "./skills/")
+
+    def test_cursor_plugin_bundles_explicit_skills_and_local_mcp(self):
+        plugin = _json(".cursor-plugin/plugin.json")
+        marketplace = _json(".cursor-plugin/marketplace.json")
+        server = _json("mcp.json")["mcpServers"]["cadence-code"]
+
+        self.assertEqual(plugin["name"], "cadence-code")
+        self.assertEqual(plugin["displayName"], "Cadence Code")
+        self.assertEqual(plugin["commands"], [])
+        self.assertEqual(plugin["mcpServers"], "./mcp.json")
+        self.assertEqual(marketplace["plugins"][0]["name"], "cadence-code")
+        self.assertEqual(marketplace["plugins"][0]["source"], "./")
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"][0], "-c")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "cursor")
+        # No cwd: an unexpanded ${CURSOR_PLUGIN_ROOT} there is a literal
+        # directory name and fails the launch before the fallback can run.
+        self.assertNotIn("cwd", server)
 
     def test_codex_manifest_bundles_mcp_without_project_config(self):
         codex = _json(".codex-plugin/plugin.json")
@@ -54,6 +81,23 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(entry["policy"]["authentication"], "ON_INSTALL")
         self.assertEqual(entry["category"], "Productivity")
 
+    def test_antigravity_plugin_bundles_skills_and_mcp(self):
+        plugin = _json("plugin.json")
+        server = _json("mcp_config.json")["mcpServers"]["cadence-code"]
+
+        self.assertEqual(
+            plugin["$schema"], "https://antigravity.google/schemas/v1/plugin.json"
+        )
+        self.assertEqual(plugin["name"], "cadence-code")
+        self.assertEqual(
+            set(plugin), {"$schema", "name", "description"}
+        )
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"][0], "-c")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "antigravity")
+        self.assertEqual(server["timeoutSeconds"], 1800)
+        self.assertNotIn("cwd", server)
+
     def test_start_talking_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/start-talking/SKILL.md").read_text(
             encoding="utf-8"
@@ -72,6 +116,7 @@ class PluginContractTests(unittest.TestCase):
         }
 
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         self.assertIn("explicitly invokes $start-talking", skill)
         self.assertIn("If `first_run` is true", skill)
         self.assertIn("before any", skill)
@@ -84,6 +129,10 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("If `first_run` is true", command)
         self.assertIn('error_code: "session_not_started"', skill)
         self.assertIn('error_code: "session_not_started"', command)
+        self.assertIn("/start-talking", skill)
+        self.assertIn("`antigravity`", skill)
+        self.assertIn("`cursor`", skill)
+        self.assertIn("bundled `scripts/setup` skill script", skill)
 
     def test_first_run_onboarding_covers_text_voice_and_host_controls(self):
         codex = (ROOT / "skills/start-talking/SKILL.md").read_text(
@@ -139,11 +188,13 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $voice-settings", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         for tool in {"voice_status", "voice_models", "voice_configure", "voice_stop"}:
             self.assertIn(f"mcp__cadence-code__{tool}", skill)
             self.assertIn(f"mcp__cadence-code__{tool}", command)
         self.assertIn("Do not call `mcp__cadence-code__voice_start`", skill)
         self.assertIn("Do not call `mcp__cadence-code__voice_start`", command)
+        self.assertIn("/voice-settings", skill)
 
         codex = _json(".codex-plugin/plugin.json")
         self.assertIn(
@@ -192,11 +243,13 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $jump-in", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         self.assertIn("mcp__cadence-code__voice_interrupt", skill)
         self.assertIn("mcp__cadence-code__voice_interrupt", command)
         self.assertIn("added guidance", skill)
         self.assertIn("added guidance", command)
         self.assertIn("Escape", command)
+        self.assertIn("/jump-in", skill)
 
     def test_wrap_up_is_explicit_and_finishes_final_speech(self):
         skill = (ROOT / "skills/wrap-up/SKILL.md").read_text(encoding="utf-8")
@@ -207,6 +260,7 @@ class PluginContractTests(unittest.TestCase):
 
         self.assertIn("explicitly invokes $wrap-up", skill)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("disable-model-invocation: true", skill)
         for workflow in (skill, command):
             self.assertIn("mcp__cadence-code__voice_status", workflow)
             self.assertIn("mcp__cadence-code__voice_speak", workflow)
@@ -214,6 +268,30 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("wait_for_speech: true", workflow)
             self.assertIn("exactly once", workflow)
             self.assertIn("Do not listen again", workflow)
+        self.assertIn("/wrap-up", skill)
+
+    def test_cursor_and_antigravity_install_workflows_are_documented(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        # /add-plugin only resolves marketplace-listed names, so the README
+        # must document the marketplace-add flow rather than a GitHub URL.
+        self.assertIn(
+            "cursor-agent plugin marketplace add "
+            "https://github.com/michael-L-i/cadence-code",
+            readme,
+        )
+        self.assertNotIn("/add-plugin cadence-code@", readme)
+        # Antigravity documents installing from a local path.
+        self.assertIn("agy plugin install ./cadence-code", readme)
+        for command in (
+            "/start-talking",
+            "/jump-in",
+            "/voice-settings",
+            "/wrap-up",
+        ):
+            self.assertIn(command, readme)
+        self.assertIn("Cursor Settings > Plugins", readme)
+        self.assertIn("agy plugin uninstall cadence-code", readme)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
         bootstrap = ROOT / "bin/cadence-code-mcp-bootstrap"
@@ -241,6 +319,150 @@ class PluginContractTests(unittest.TestCase):
         for line in logical_source.splitlines():
             if line.strip().startswith("echo "):
                 self.assertIn(">", line, f"echo lacks a redirection: {line}")
+
+
+class GeneratedManifestTests(unittest.TestCase):
+    """Every host manifest is generated from scripts/host_manifests.py."""
+
+    def test_no_manifest_has_drifted_from_its_source(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/generate_manifests.py"), "--check"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_generation_is_idempotent(self):
+        before = {path: (ROOT / path).read_bytes() for path in _manifests()}
+        subprocess.run(
+            [sys.executable, str(ROOT / "scripts/generate_manifests.py")],
+            check=True,
+            capture_output=True,
+        )
+        for path, content in before.items():
+            self.assertEqual((ROOT / path).read_bytes(), content, path)
+
+    def test_every_supported_host_is_covered(self):
+        generated = set(_manifests())
+
+        self.assertIn(".claude-plugin/plugin.json", generated)
+        self.assertIn(".codex-plugin/plugin.json", generated)
+        self.assertIn(".cursor-plugin/plugin.json", generated)
+        self.assertIn("plugin.json", generated)
+        # Installed and checkout MCP declarations for both newer hosts.
+        self.assertIn("mcp.json", generated)
+        self.assertIn(".cursor/mcp.json", generated)
+        self.assertIn("mcp_config.json", generated)
+        self.assertIn(".agents/mcp_config.json", generated)
+
+
+class BootstrapLauncherTests(unittest.TestCase):
+    """The generated `bash -c` launchers must survive an unexpanded root.
+
+    Cursor's ${CURSOR_PLUGIN_ROOT} and Antigravity's ${extensionPath} are not
+    documented for MCP manifests, so these run the real programs against a fake
+    plugin tree to prove they resolve either way and fail loudly otherwise.
+    """
+
+    HOSTS = {
+        "mcp.json": ("cursor", "${CURSOR_PLUGIN_ROOT}"),
+        "mcp_config.json": ("antigravity", "${extensionPath}"),
+    }
+
+    def _program(self, manifest_path):
+        server = _manifests()[manifest_path]["mcpServers"]["cadence-code"]
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["args"][0], "-c")
+        return server["args"][1]
+
+    def _fake_plugin(self, directory):
+        """A plugin tree whose bootstrap reports the host it received."""
+        root = Path(directory) / "plugin"
+        (root / "bin").mkdir(parents=True)
+        bootstrap = root / "bin/cadence-code-mcp-bootstrap"
+        bootstrap.write_text(
+            '#!/bin/bash\necho "ran host=${CADENCE_CODE_HOST}"\n',
+            encoding="utf-8",
+        )
+        bootstrap.chmod(0o755)
+        return root
+
+    def _run(self, program, cwd, home):
+        return subprocess.run(
+            ["bash", "-c", program],
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            # A bare HOME keeps the last candidate from hitting a real install.
+            env={"PATH": os.environ["PATH"], "HOME": str(home)},
+        )
+
+    def test_launcher_runs_when_the_host_expands_its_plugin_root(self):
+        for manifest_path, (host, placeholder) in self.HOSTS.items():
+            with self.subTest(manifest_path), tempfile.TemporaryDirectory() as tmp:
+                root = self._fake_plugin(tmp)
+                expanded = self._program(manifest_path).replace(
+                    placeholder, str(root)
+                )
+                result = self._run(expanded, cwd=tmp, home=Path(tmp) / "home")
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), f"ran host={host}")
+
+    def test_launcher_falls_back_when_the_placeholder_is_not_expanded(self):
+        for manifest_path, (host, _placeholder) in self.HOSTS.items():
+            with self.subTest(manifest_path), tempfile.TemporaryDirectory() as tmp:
+                root = self._fake_plugin(tmp)
+                # Unexpanded: bash sees an unset variable and empties it, so
+                # the working directory must still resolve the bootstrap.
+                result = self._run(
+                    self._program(manifest_path),
+                    cwd=root,
+                    home=Path(tmp) / "home",
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), f"ran host={host}")
+
+    def test_launcher_fails_on_stderr_without_corrupting_the_mcp_channel(self):
+        for manifest_path in self.HOSTS:
+            with self.subTest(manifest_path), tempfile.TemporaryDirectory() as tmp:
+                empty = Path(tmp) / "empty"
+                empty.mkdir()
+                result = self._run(
+                    self._program(manifest_path),
+                    cwd=empty,
+                    home=Path(tmp) / "home",
+                )
+
+                self.assertEqual(result.returncode, 1)
+                # stdout is the JSON-RPC channel and must stay untouched.
+                self.assertEqual(result.stdout, "")
+                self.assertIn("could not locate", result.stderr)
+
+
+class AsyncStartContractTests(unittest.TestCase):
+    """Model loading never depends on a host's MCP tool deadline."""
+
+    def test_voice_start_does_not_block_by_default(self):
+        source = (ROOT / "cadence_code/mcp/server.py").read_text(encoding="utf-8")
+
+        self.assertIn("def voice_start(wait: bool = False)", source)
+        self.assertIn("poll voice_status until ready", source)
+
+    def test_every_workflow_polls_instead_of_waiting_on_start(self):
+        skill = (ROOT / "skills/start-talking/SKILL.md").read_text(encoding="utf-8")
+        command = (ROOT / "commands/start-talking.md").read_text(encoding="utf-8")
+
+        for workflow in (skill, command):
+            normalized = " ".join(workflow.split())
+            self.assertIn("poll `voice_status` until `ready` is true", normalized)
+            self.assertIn("start_error", normalized)
+            self.assertIn("in the background", normalized)
+        # The polling path is no longer described as Cursor-specific.
+        self.assertNotIn("In Cursor, call `voice_start` with `wait: false`", skill)
 
 
 if __name__ == "__main__":

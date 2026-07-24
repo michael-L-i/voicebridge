@@ -34,7 +34,8 @@ def _loader(provider: str, model_type):
 
 
 class _AllProvidersRuntime:
-    def start(self) -> dict:
+    def start(self, *, wait: bool = True) -> dict:
+        assert wait
         invoked = []
         for name, provider_type in registry.TTS_PROVIDERS.items():
             module = __import__(provider_type.__module__, fromlist=["load_model"])

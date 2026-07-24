@@ -1,20 +1,70 @@
 #!/usr/bin/env python3
-"""Validate repository-owned plugin contracts without loading speech models."""
+"""Validate repository-owned plugin contracts without loading speech models.
+
+Per-host manifest *fields* are not asserted here. They are generated from
+``scripts/host_manifests.py``, so this checks that the files on disk still match
+that source and then validates what generation cannot: the skill symlinks, the
+required file set, and the bash that actually launches the server.
+"""
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
+from generate_manifests import drift
+from host_manifests import ROOT, manifests, project_version
 
-ROOT = Path(__file__).resolve().parent.parent
+
+def validate_generated_manifests(failures: list[str]) -> None:
+    """Fail when a manifest was hand-edited instead of regenerated."""
+    diffs = drift()
+    for diff in diffs:
+        print(diff, end="", file=sys.stderr)
+    if diffs:
+        failures.append(
+            f"{len(diffs)} manifest(s) drifted from scripts/host_manifests.py; "
+            "run: python scripts/generate_manifests.py"
+        )
 
 
-def load_json(relative_path: str) -> dict:
-    return json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+def validate_launcher_programs(failures: list[str]) -> None:
+    """Check every generated ``bash -c`` launcher for syntax and stdout purity.
+
+    These programs are the first thing a host executes. A syntax error or a
+    stray stdout write corrupts the MCP JSON-RPC handshake, and neither failure
+    is visible until a real host session dies.
+    """
+    for relative_path, manifest in sorted(manifests().items()):
+        # Cursor's plugin.json points at a sibling file rather than inlining.
+        servers = manifest.get("mcpServers", {})
+        if not isinstance(servers, dict):
+            continue
+        for name, server in servers.items():
+            if not isinstance(server, dict):
+                continue
+            arguments = server.get("args") or []
+            if server.get("command") != "bash" or arguments[:1] != ["-c"]:
+                continue
+            program = arguments[1]
+            syntax = subprocess.run(
+                ["bash", "-n", "-c", program],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if syntax.returncode:
+                failures.append(
+                    f"{relative_path}: {name} launcher is invalid bash: "
+                    f"{syntax.stderr.strip()}"
+                )
+            for statement in program.split("; "):
+                if statement.startswith("echo ") and ">&2" not in statement:
+                    failures.append(
+                        f"{relative_path}: {name} launcher writes to stdout, "
+                        f"which corrupts the MCP channel: {statement}"
+                    )
 
 
 def validate_development_skills(failures: list[str]) -> None:
@@ -44,31 +94,18 @@ def validate_development_skills(failures: list[str]) -> None:
 
 
 def main() -> int:
-    with (ROOT / "pyproject.toml").open("rb") as file:
-        project = tomllib.load(file)["project"]
-
-    claude = load_json(".claude-plugin/plugin.json")
-    codex = load_json(".codex-plugin/plugin.json")
-    version = project["version"]
-
+    version = project_version()
     failures: list[str] = []
-    if claude.get("version") != version or codex.get("version") != version:
-        failures.append("plugin manifest versions must match pyproject.toml")
-    if claude.get("mcpServers", {}).get("cadence-code", {}).get("command") != (
-        "${CLAUDE_PLUGIN_ROOT}/bin/cadence-code-mcp-bootstrap"
-    ):
-        failures.append("Claude Code must use the repository bootstrap")
-    codex_server = codex.get("mcpServers", {}).get("cadence-code", {})
-    if codex_server.get("command") != "bash":
-        failures.append("Codex MCP server must launch through bash")
-    if codex_server.get("args") != ["./bin/cadence-code-mcp-bootstrap"]:
-        failures.append("Codex MCP server must use the repository bootstrap")
+
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
 
+    validate_generated_manifests(failures)
+    validate_launcher_programs(failures)
     validate_development_skills(failures)
 
     required_paths = [
+        *sorted(manifests()),
         "bin/cadence-code-mcp-bootstrap",
         "commands/jump-in.md",
         "commands/start-talking.md",
@@ -80,6 +117,7 @@ def main() -> int:
         "skills/jump-in/agents/openai.yaml",
         "skills/start-talking/SKILL.md",
         "skills/start-talking/agents/openai.yaml",
+        "skills/start-talking/scripts/setup",
         "skills/voice-settings/SKILL.md",
         "skills/voice-settings/agents/openai.yaml",
         "skills/wrap-up/SKILL.md",

@@ -13,6 +13,8 @@ Commands:
   inspector   Open the checkout's MCP server in MCP Inspector
   claude      Launch Claude Code with the checkout loaded directly
   codex       Launch Codex with the checkout's MCP server directly
+  cursor      Launch Cursor Agent with the checkout loaded directly
+  agy         Launch Antigravity CLI with the checkout loaded directly
   reset       Remove all isolated local-development state
 EOF
 }
@@ -21,9 +23,8 @@ check_help() {
   cat <<'EOF'
 Usage: ./dev check
 
-Run Bash syntax checks, the Python unit tests, and strict Claude plugin
-validation when the Claude Code CLI is installed. This command does not install
-dependencies or download speech models.
+Run Bash syntax checks, unit tests, and installed-host plugin validators.
+This does not install dependencies or download speech models.
 EOF
 }
 
@@ -60,14 +61,45 @@ keeping the private venv.
 EOF
 }
 
+cursor_help() {
+  cat <<'EOF'
+Usage: ./dev cursor [--fresh] [--plugin] [cursor-agent-options]
+
+Launch Cursor Agent from the repository root. The checkout's workspace MCP
+configuration and shared Agent Skills load directly; no plugin is installed and
+no user Cursor configuration is changed. Inside Cursor, run /start-talking.
+Use --fresh to clear the development configuration and onboarding marker while
+keeping the private venv.
+
+Use --plugin to load the checkout through --plugin-dir instead, which exercises
+the installed-plugin path: .cursor-plugin/plugin.json and the root mcp.json,
+including whether Cursor expands ${CURSOR_PLUGIN_ROOT}. That placeholder is
+undocumented, so this is the only local check that the shipped manifest
+resolves. The workspace .cursor/mcp.json is bypassed.
+EOF
+}
+
+agy_help() {
+  cat <<'EOF'
+Usage: ./dev agy [--fresh] [agy-options]
+
+Launch Antigravity CLI from the repository root. The checkout's workspace MCP
+configuration and shared Agent Skills load directly; no plugin is installed and
+no user Antigravity configuration is changed. Inside AGY, run /start-talking.
+Use --fresh to clear the development configuration and onboarding marker while
+keeping the private venv.
+EOF
+}
+
 reset_help() {
   cat <<'EOF'
 Usage: ./dev reset
 
 Move the checkout's complete .cadence-code-dev directory to macOS Trash. This
 removes development venvs, configuration, and onboarding state for Inspector,
-Claude Code, and Codex. Production plugin data and shared model caches are not
-touched. Close every Cadence Code host session before running this command.
+Claude Code, Codex, Cursor, and Antigravity. Production plugin data and shared
+model caches are not touched. Close every Cadence Code host session before
+running this command.
 EOF
 }
 
@@ -170,6 +202,13 @@ run_check() {
     claude plugin validate --strict "${REPO_ROOT}"
   else
     echo "[cadence-code-dev] Claude Code is not installed; skipping plugin validation" >&2
+  fi
+
+  if command -v agy >/dev/null 2>&1; then
+    echo "[cadence-code-dev] validating Antigravity plugin"
+    agy plugin validate "${REPO_ROOT}"
+  else
+    echo "[cadence-code-dev] Antigravity CLI is not installed; skipping plugin validation" >&2
   fi
 }
 
@@ -289,6 +328,104 @@ run_codex() {
   exec "${codex_bin}" "${cadence_code_config[@]}" "${codex_args[@]}"
 }
 
+run_cursor() {
+  if [ "${1:-}" = "--help" ]; then
+    cursor_help
+    return
+  fi
+
+  local fresh=0
+  local plugin=0
+  local -a cursor_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      --plugin)
+        plugin=1
+        ;;
+      *)
+        cursor_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local cursor_bin="${CADENCE_CODE_DEV_CURSOR_BIN:-agent}"
+  if ! command -v "${cursor_bin}" >/dev/null 2>&1; then
+    echo "[cadence-code-dev] ERROR: Cursor Agent is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir cursor)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[cadence-code-dev] reset Cursor development onboarding"
+  fi
+  cd "${REPO_ROOT}"
+  export CADENCE_CODE_DATA_DIR="${data_dir}"
+
+  local -a cursor_config=(--workspace "${REPO_ROOT}")
+  if [ "${plugin}" = "1" ]; then
+    # Load the shipped plugin manifest instead of the workspace MCP file, and
+    # leave CADENCE_CODE_HOST unset so the run proves the manifest itself
+    # establishes host identity and resolves the bootstrap.
+    cursor_config+=(--plugin-dir "${REPO_ROOT}")
+    unset CADENCE_CODE_HOST
+    echo "[cadence-code-dev] loading the installed Cursor plugin path" >&2
+  else
+    export CADENCE_CODE_HOST="cursor"
+  fi
+
+  if [ "${#cursor_args[@]}" -eq 0 ]; then
+    exec "${cursor_bin}" "${cursor_config[@]}"
+  fi
+  exec "${cursor_bin}" "${cursor_config[@]}" "${cursor_args[@]}"
+}
+
+run_agy() {
+  if [ "${1:-}" = "--help" ]; then
+    agy_help
+    return
+  fi
+
+  local fresh=0
+  local -a agy_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fresh)
+        fresh=1
+        ;;
+      *)
+        agy_args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local agy_bin="${CADENCE_CODE_DEV_AGY_BIN:-agy}"
+  if ! command -v "${agy_bin}" >/dev/null 2>&1; then
+    echo "[cadence-code-dev] ERROR: Antigravity CLI is not installed." >&2
+    exit 1
+  fi
+
+  local data_dir
+  data_dir=$(development_dir antigravity)
+  if [ "${fresh}" = "1" ]; then
+    reset_onboarding "${data_dir}"
+    echo "[cadence-code-dev] reset Antigravity development onboarding"
+  fi
+  cd "${REPO_ROOT}"
+  export CADENCE_CODE_DATA_DIR="${data_dir}"
+  export CADENCE_CODE_HOST="antigravity"
+  if [ "${#agy_args[@]}" -eq 0 ]; then
+    exec "${agy_bin}"
+  fi
+  exec "${agy_bin}" "${agy_args[@]}"
+}
+
 case "${1:-}" in
   check)
     shift
@@ -305,6 +442,14 @@ case "${1:-}" in
   codex)
     shift
     run_codex "$@"
+    ;;
+  cursor)
+    shift
+    run_cursor "$@"
+    ;;
+  agy|antigravity)
+    shift
+    run_agy "$@"
     ;;
   reset)
     shift
