@@ -43,6 +43,20 @@ def validate_development_skills(failures: list[str]) -> None:
             )
 
 
+def validate_antigravity_development_mcp(failures: list[str]) -> None:
+    server = load_json(".agents/mcp_config.json").get("mcpServers", {}).get(
+        "cadence-code", {}
+    )
+    if server.get("command") != "bash":
+        failures.append("Antigravity development MCP must launch through bash")
+    if server.get("args") != ["./bin/cadence-code-mcp-bootstrap"]:
+        failures.append("Antigravity development MCP must use the checkout bootstrap")
+    if server.get("cwd") != ".":
+        failures.append("Antigravity development MCP must run from the checkout root")
+    if server.get("env", {}).get("CADENCE_CODE_HOST") != "antigravity":
+        failures.append("Antigravity development MCP must identify its host")
+
+
 def main() -> int:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project = tomllib.load(file)["project"]
@@ -90,8 +104,10 @@ def main() -> int:
         failures.append("Antigravity MCP server must identify its host")
 
     validate_development_skills(failures)
+    validate_antigravity_development_mcp(failures)
 
     required_paths = [
+        ".agents/mcp_config.json",
         "bin/cadence-code-mcp-bootstrap",
         "mcp_config.json",
         "plugin.json",

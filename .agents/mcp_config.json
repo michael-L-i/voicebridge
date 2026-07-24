@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "cadence-code": {
+      "command": "bash",
+      "args": [
+        "./bin/cadence-code-mcp-bootstrap"
+      ],
+      "cwd": ".",
+      "env": {
+        "CADENCE_CODE_HOST": "antigravity"
+      }
+    }
+  }
+}
