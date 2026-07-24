@@ -22,9 +22,8 @@ check_help() {
   cat <<'EOF'
 Usage: ./dev check
 
-Run Bash syntax checks, the Python unit tests, and strict Claude plugin
-validation when the Claude Code CLI is installed. This command does not install
-dependencies or download speech models.
+Run Bash syntax checks, unit tests, and installed-host plugin validators.
+This does not install dependencies or download speech models.
 EOF
 }
 

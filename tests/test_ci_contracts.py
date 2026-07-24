@@ -130,7 +130,7 @@ class CiContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_bug_report_collects_both_host_and_voice_context(self):
+    def test_bug_report_collects_host_and_voice_context(self):
         form = (ROOT / ".github/ISSUE_TEMPLATE/bug_report.yml").read_text(
             encoding="utf-8"
         )
@@ -148,6 +148,7 @@ class CiContractTests(unittest.TestCase):
         for detail in (
             "Codex",
             "Claude Code",
+            "Google Antigravity",
             "macOS version:",
             "Mac model/chip:",
             "Python version:",

@@ -169,6 +169,7 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn(f"mcp__cadence-code__{tool}", command)
         self.assertIn("Do not call `mcp__cadence-code__voice_start`", skill)
         self.assertIn("Do not call `mcp__cadence-code__voice_start`", command)
+        self.assertIn("/voice-settings", skill)
 
         codex = _json(".codex-plugin/plugin.json")
         self.assertIn(
@@ -241,6 +242,22 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("exactly once", workflow)
             self.assertIn("Do not listen again", workflow)
         self.assertIn("/wrap-up", skill)
+
+    def test_antigravity_install_and_all_four_commands_are_documented(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "agy plugin install https://github.com/michael-L-i/cadence-code",
+            readme,
+        )
+        for command in (
+            "/start-talking",
+            "/jump-in",
+            "/voice-settings",
+            "/wrap-up",
+        ):
+            self.assertIn(command, readme)
+        self.assertIn("agy plugin uninstall cadence-code", readme)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
         bootstrap = ROOT / "bin/cadence-code-mcp-bootstrap"
