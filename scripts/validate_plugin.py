@@ -49,6 +49,8 @@ def main() -> int:
 
     claude = load_json(".claude-plugin/plugin.json")
     codex = load_json(".codex-plugin/plugin.json")
+    antigravity = load_json("plugin.json")
+    antigravity_mcp = load_json("mcp_config.json")
     version = project["version"]
 
     failures: list[str] = []
@@ -65,11 +67,34 @@ def main() -> int:
         failures.append("Codex MCP server must use the repository bootstrap")
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
+    if antigravity.get("$schema") != (
+        "https://antigravity.google/schemas/v1/plugin.json"
+    ):
+        failures.append("Antigravity plugin must use the official schema")
+    if antigravity.get("name") != "cadence-code":
+        failures.append("Antigravity plugin name must be cadence-code")
+    antigravity_server = antigravity_mcp.get("mcpServers", {}).get(
+        "cadence-code", {}
+    )
+    if antigravity_server.get("command") != "bash":
+        failures.append("Antigravity MCP server must launch through bash")
+    if antigravity_server.get("args") != [
+        "${extensionPath}/bin/cadence-code-mcp-bootstrap"
+    ]:
+        failures.append("Antigravity MCP server must use the installed bootstrap")
+    if antigravity_server.get("cwd") != "${extensionPath}":
+        failures.append("Antigravity MCP server must run from its plugin root")
+    if antigravity_server.get("env", {}).get("CADENCE_CODE_HOST") != (
+        "antigravity"
+    ):
+        failures.append("Antigravity MCP server must identify its host")
 
     validate_development_skills(failures)
 
     required_paths = [
         "bin/cadence-code-mcp-bootstrap",
+        "mcp_config.json",
+        "plugin.json",
         "commands/jump-in.md",
         "commands/start-talking.md",
         "commands/voice-settings.md",

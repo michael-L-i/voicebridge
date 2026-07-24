@@ -1,6 +1,6 @@
 ---
 name: start-talking
-description: Start and run an explicit, interactive Cadence Code conversation with Codex using fully local speech input and output. Use only when the user explicitly invokes $start-talking or asks to start talking with Cadence Code.
+description: Start and run an explicit Cadence Code conversation with Codex or Antigravity using fully local speech input and output. Use only when the user explicitly invokes $start-talking, /start-talking, or asks to start talking with Cadence Code.
 ---
 
 # Start Talking
@@ -9,12 +9,15 @@ Run a deliberate voice loop through the `mcp__cadence-code__voice_status`,
 `mcp__cadence-code__voice_models`, `mcp__cadence-code__voice_configure`,
 `mcp__cadence-code__voice_start`, `mcp__cadence-code__voice_speak`,
 `mcp__cadence-code__voice_listen`, and `mcp__cadence-code__voice_stop` tools.
-Cadence Code only performs speech input and output. Codex controls the
+Antigravity may display these as the corresponding `voice_status`,
+`voice_models`, `voice_configure`, `voice_start`, `voice_speak`,
+`voice_listen`, and `voice_stop` tools under the `cadence-code` MCP server.
+Cadence Code only performs speech input and output. The host agent controls the
 conversation and authors every word sent to speech.
 
 Maintain two outputs for completed work:
 
-- Keep useful technical detail in the normal written Codex response.
+- Keep useful technical detail in the normal written host response.
 - Compose a separate short, conversational summary for `voice_speak`. Never
   read code, file paths, bullet lists, or the full written response aloud.
 
@@ -35,21 +38,21 @@ Maintain two outputs for completed work:
    | with the useful details on screen, then listen for your next turn.
    |
    +-- QUICK CONTROLS -------------------------------------------------+
-   | $start-talking    Start a Cadence Code conversation.
-   | $jump-in          Press Escape, then redirect me by voice.
-   | $wrap-up          End the conversation and release the models.
-   | $voice-settings   Change the voice or speech model.
+   | $start-talking /start-talking    Start a conversation.
+   | $jump-in       /jump-in          Redirect me by voice.
+   | $wrap-up       /wrap-up          End and release the models.
+   | $voice-settings /voice-settings  Change speech models.
    | You can also say "stop" or "goodbye" at any time.
    |
    +-- READY TO GO ----------------------------------------------------+
    | Voice              Pocket TTS 100M
    | Speech recognition Parakeet 110M
    | These local defaults load automatically. Change them anytime
-   | with $voice-settings.
+   | with $voice-settings or /voice-settings.
    |
    +-- PRIVATE BY DEFAULT ---------------------------------------------+
    | Listening and speaking stay on this Mac. Your transcript becomes
-   | a normal Codex instruction.
+   | a normal coding-agent instruction.
    +------------------------------------------------------------------+
    ```
 
@@ -62,10 +65,11 @@ Maintain two outputs for completed work:
 2. Call `voice_start` and wait for the audio preflight and local speech models.
    Do not call any Cadence Code audio tool before this explicit skill invocation.
    If it returns `ok: false`, show the error and end without retrying.
-3. Verify the result includes `version`, `host`, `capture`, and `preflight`, and
-   that `host` is `codex`. If not, the MCP process is stale or misconfigured:
-   call `voice_stop`, ask the user to start a new Codex session after updating
-   or reinstalling the plugin, and end.
+3. Verify the result includes `version`, `host`, `capture`, and `preflight`.
+   The host must be `codex` when invoked from Codex or `antigravity` when
+   invoked from Antigravity. If it does not match, the MCP process is stale or
+   misconfigured: call `voice_stop`, ask the user to restart the current host
+   after updating or reinstalling the plugin, and end.
 4. Speak a greeting with `listen_after: true`, then call `voice_listen`
    immediately. If `first_run` was true, use this short introduction verbatim:
    "Welcome to Cadence Code. I want to talk with you about whatever you're
@@ -78,7 +82,7 @@ Maintain two outputs for completed work:
    queued capture. Do not add filler or perform other work between those tool
    calls.
 5. Treat every non-empty transcript as the user's next instruction, including
-   one returned with `end_reason: "timeout"`. Use normal Codex tools to do the
+   one returned with `end_reason: "timeout"`. Use normal host tools to do the
    work silently, without spoken command-by-command narration.
 6. For noticeably long work, first acknowledge it with one natural sentence
    and keep `listen_after` false for that progress update. When finished, call
@@ -110,7 +114,8 @@ After `voice_start` succeeds, call `voice_stop` exactly once at the end and
 never between turns. Keep speech brief unless the user explicitly requests a
 spoken walkthrough.
 
-If the user presses Escape during a turn, they can invoke `$jump-in` to
+If the user presses Escape during a turn, they can invoke `$jump-in` in Codex
+or `/jump-in` in Antigravity to
 silence current Cadence Code audio and add spoken guidance without unloading the
 models. The separate Jump In skill owns that recovery workflow. The user can
-invoke `$wrap-up` to end the conversation directly.
+invoke `$wrap-up` or `/wrap-up` to end the conversation directly.

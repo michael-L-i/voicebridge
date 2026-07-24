@@ -54,6 +54,25 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(entry["policy"]["authentication"], "ON_INSTALL")
         self.assertEqual(entry["category"], "Productivity")
 
+    def test_antigravity_plugin_bundles_skills_and_mcp(self):
+        plugin = _json("plugin.json")
+        server = _json("mcp_config.json")["mcpServers"]["cadence-code"]
+
+        self.assertEqual(
+            plugin["$schema"], "https://antigravity.google/schemas/v1/plugin.json"
+        )
+        self.assertEqual(plugin["name"], "cadence-code")
+        self.assertEqual(
+            set(plugin), {"$schema", "name", "description"}
+        )
+        self.assertEqual(server["command"], "bash")
+        self.assertEqual(
+            server["args"],
+            ["${extensionPath}/bin/cadence-code-mcp-bootstrap"],
+        )
+        self.assertEqual(server["cwd"], "${extensionPath}")
+        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "antigravity")
+
     def test_start_talking_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/start-talking/SKILL.md").read_text(
             encoding="utf-8"
@@ -84,6 +103,8 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("If `first_run` is true", command)
         self.assertIn('error_code: "session_not_started"', skill)
         self.assertIn('error_code: "session_not_started"', command)
+        self.assertIn("/start-talking", skill)
+        self.assertIn("`antigravity`", skill)
 
     def test_first_run_onboarding_covers_text_voice_and_host_controls(self):
         codex = (ROOT / "skills/start-talking/SKILL.md").read_text(
@@ -197,6 +218,7 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("added guidance", skill)
         self.assertIn("added guidance", command)
         self.assertIn("Escape", command)
+        self.assertIn("/jump-in", skill)
 
     def test_wrap_up_is_explicit_and_finishes_final_speech(self):
         skill = (ROOT / "skills/wrap-up/SKILL.md").read_text(encoding="utf-8")
@@ -214,6 +236,7 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("wait_for_speech: true", workflow)
             self.assertIn("exactly once", workflow)
             self.assertIn("Do not listen again", workflow)
+        self.assertIn("/wrap-up", skill)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):
         bootstrap = ROOT / "bin/cadence-code-mcp-bootstrap"
