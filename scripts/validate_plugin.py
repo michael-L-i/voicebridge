@@ -47,14 +47,16 @@ def validate_antigravity_development_mcp(failures: list[str]) -> None:
     server = load_json(".agents/mcp_config.json").get("mcpServers", {}).get(
         "cadence-code", {}
     )
-    if server.get("command") != "bash":
-        failures.append("Antigravity development MCP must launch through bash")
-    if server.get("args") != ["./bin/cadence-code-mcp-bootstrap"]:
+    if server.get("command") != "env":
+        failures.append("Antigravity development MCP must launch through env")
+    if server.get("args") != [
+        "CADENCE_CODE_HOST=antigravity",
+        "bash",
+        "./bin/cadence-code-mcp-bootstrap",
+    ]:
         failures.append("Antigravity development MCP must use the checkout bootstrap")
     if server.get("cwd") != ".":
         failures.append("Antigravity development MCP must run from the checkout root")
-    if server.get("env", {}).get("CADENCE_CODE_HOST") != "antigravity":
-        failures.append("Antigravity development MCP must identify its host")
 
 
 def main() -> int:
@@ -90,18 +92,16 @@ def main() -> int:
     antigravity_server = antigravity_mcp.get("mcpServers", {}).get(
         "cadence-code", {}
     )
-    if antigravity_server.get("command") != "bash":
-        failures.append("Antigravity MCP server must launch through bash")
+    if antigravity_server.get("command") != "env":
+        failures.append("Antigravity MCP server must launch through env")
     if antigravity_server.get("args") != [
+        "CADENCE_CODE_HOST=antigravity",
+        "bash",
         "${extensionPath}/bin/cadence-code-mcp-bootstrap"
     ]:
         failures.append("Antigravity MCP server must use the installed bootstrap")
     if antigravity_server.get("cwd") != "${extensionPath}":
         failures.append("Antigravity MCP server must run from its plugin root")
-    if antigravity_server.get("env", {}).get("CADENCE_CODE_HOST") != (
-        "antigravity"
-    ):
-        failures.append("Antigravity MCP server must identify its host")
 
     validate_development_skills(failures)
     validate_antigravity_development_mcp(failures)

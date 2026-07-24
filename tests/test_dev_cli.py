@@ -271,10 +271,16 @@ class DevCliTests(unittest.TestCase):
             (ROOT / ".agents/mcp_config.json").read_text(encoding="utf-8")
         )["mcpServers"]["cadence-code"]
 
-        self.assertEqual(server["command"], "bash")
-        self.assertEqual(server["args"], ["./bin/cadence-code-mcp-bootstrap"])
+        self.assertEqual(server["command"], "env")
+        self.assertEqual(
+            server["args"],
+            [
+                "CADENCE_CODE_HOST=antigravity",
+                "bash",
+                "./bin/cadence-code-mcp-bootstrap",
+            ],
+        )
         self.assertEqual(server["cwd"], ".")
-        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "antigravity")
 
     def test_agy_fresh_resets_onboarding_but_keeps_venv(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -65,13 +65,16 @@ class PluginContractTests(unittest.TestCase):
         self.assertEqual(
             set(plugin), {"$schema", "name", "description"}
         )
-        self.assertEqual(server["command"], "bash")
+        self.assertEqual(server["command"], "env")
         self.assertEqual(
             server["args"],
-            ["${extensionPath}/bin/cadence-code-mcp-bootstrap"],
+            [
+                "CADENCE_CODE_HOST=antigravity",
+                "bash",
+                "${extensionPath}/bin/cadence-code-mcp-bootstrap",
+            ],
         )
         self.assertEqual(server["cwd"], "${extensionPath}")
-        self.assertEqual(server["env"]["CADENCE_CODE_HOST"], "antigravity")
 
     def test_start_talking_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/start-talking/SKILL.md").read_text(
