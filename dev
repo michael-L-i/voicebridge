@@ -91,9 +91,9 @@ Usage: ./dev reset
 
 Move the checkout's complete .cadence-code-dev directory to macOS Trash. This
 removes development venvs, configuration, and onboarding state for Inspector,
-    Claude Code, Codex, Cursor, and Antigravity. Production plugin data and shared
-    model caches are not touched. Close every Cadence Code host session before
-    running this command.
+Claude Code, Codex, Cursor, and Antigravity. Production plugin data and shared
+model caches are not touched. Close every Cadence Code host session before
+running this command.
 EOF
 }
 

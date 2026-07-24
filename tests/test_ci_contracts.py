@@ -148,6 +148,7 @@ class CiContractTests(unittest.TestCase):
         for detail in (
             "Codex",
             "Claude Code",
+            "Cursor",
             "Google Antigravity",
             "macOS version:",
             "Mac model/chip:",

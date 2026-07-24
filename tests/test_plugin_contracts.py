@@ -271,9 +271,13 @@ class PluginContractTests(unittest.TestCase):
             self.assertIn("Do not listen again", workflow)
         self.assertIn("/wrap-up", skill)
 
-    def test_antigravity_install_and_all_four_commands_are_documented(self):
+    def test_cursor_and_antigravity_install_workflows_are_documented(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
+        self.assertIn(
+            "/add-plugin cadence-code@https://github.com/michael-L-i/cadence-code",
+            readme,
+        )
         self.assertIn(
             "agy plugin install https://github.com/michael-L-i/cadence-code",
             readme,
@@ -285,6 +289,7 @@ class PluginContractTests(unittest.TestCase):
             "/wrap-up",
         ):
             self.assertIn(command, readme)
+        self.assertIn("Cursor Settings > Plugins", readme)
         self.assertIn("agy plugin uninstall cadence-code", readme)
 
     def test_bootstrap_is_valid_bash_and_checks_platform_before_rebuild(self):

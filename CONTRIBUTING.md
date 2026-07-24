@@ -91,6 +91,18 @@ user-level Codex configuration is changed.
 Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.
 
+Cursor Agent can load the checkout's workspace MCP configuration and shared
+Agent Skills without installing the plugin:
+
+```bash
+./dev cursor
+```
+
+Then invoke `/start-talking`, `/voice-settings`, `/jump-in`, or `/wrap-up`.
+Nothing is installed globally and no user-level Cursor configuration is
+changed. Use `./dev cursor --fresh` to repeat first-run setup without rebuilding
+the development venv.
+
 Antigravity CLI uses the checkout's native workspace MCP configuration and the
 same Agent Skills:
 
@@ -104,8 +116,8 @@ changed. Use `./dev agy --fresh` to repeat first-run setup without rebuilding
 the development venv.
 
 When you need to discard every local-development venv and configuration, first
-close Claude Code, Codex, Antigravity, and MCP Inspector sessions using Cadence
-Code, then run:
+close Claude Code, Codex, Cursor, Antigravity, and MCP Inspector sessions using
+Cadence Code, then run:
 
 ```bash
 ./dev reset

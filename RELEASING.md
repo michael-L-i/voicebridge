@@ -1,11 +1,11 @@
 # Releasing Cadence Code
 
 Cadence Code releases are source releases for the Codex and Claude Code
-marketplaces and Antigravity's GitHub plugin installer. The repository does not
-publish to PyPI, Homebrew, or any other package registry. The default branch is
-the distribution source: merging to `main` makes that source available to users
-who refresh and update, even before a matching GitHub Release exists. Treat the
-merge as publication, not as a private staging step.
+marketplaces and the Cursor and Antigravity GitHub plugin installers. The
+repository does not publish to PyPI, Homebrew, or any other package registry.
+The default branch is the distribution source: merging to `main` makes that
+source available to users who refresh and update, even before a matching GitHub
+Release exists. Treat the merge as publication, not as a private staging step.
 
 ## Before creating a release
 
@@ -24,6 +24,7 @@ For a version change, update every version-bearing contract together:
 - `uv.lock` (regenerate it after changing the project version)
 - `.claude-plugin/plugin.json`
 - `.codex-plugin/plugin.json`
+- `.cursor-plugin/plugin.json`
 - the hardcoded expected version in `tests/test_plugin_contracts.py`
 
 Before merging, push the exact candidate commit and manually dispatch
@@ -41,11 +42,11 @@ Release remains a defense-in-depth check of the tag itself.
 ## Manual release checklist
 
 Exercise fresh installs and upgrades from the previous version in Codex, Claude
-Code, and Antigravity. Stop one test session completely before starting the
-next because the machine-wide audio lock permits only one conversation. Before
-merge, use temporary GitHub-backed test marketplaces for Codex and Claude Code
-and install Antigravity from the pushed candidate branch or SHA; do not use a
-local checkout override.
+Code, Cursor, and Antigravity. Stop one test session completely before starting
+the next because the machine-wide audio lock permits only one conversation.
+Before merge, use temporary GitHub-backed test marketplaces for Codex and
+Claude Code and install Cursor and Antigravity from the pushed candidate branch
+or SHA; do not use a local checkout override.
 
 For each fresh test:
 
@@ -66,7 +67,8 @@ For every path:
   `--plugin-dir`, a checkout MCP override, or a stale cache, and record the
   source commit and runtime version.
 - Confirm `voice_status` reports the new version and the correct host
-  (`codex`, `claude-code`, or `antigravity`) after the required host restart.
+  (`codex`, `claude-code`, `cursor`, or `antigravity`) after the required host
+  restart.
 - Invoke Start Talking, speak a response, listen and transcribe a reply,
   exercise Jump In, then use Wrap Up and confirm the session releases.
 - Start a second new host process and repeat the status/start/stop smoke test to
@@ -78,9 +80,9 @@ For every path:
    candidate checklist above.
 2. Merge the reviewed version-change pull request after every required check
    passes. The refreshed marketplace snapshot is now the released source.
-3. Refresh the normal GitHub-backed marketplaces and reinstall the Antigravity
-   plugin, restart each host, then repeat the source, version/host, and
-   start/stop checks. Confirm they resolve the merged default-branch commit
+3. Refresh the normal GitHub-backed marketplaces and reinstall the Cursor and
+   Antigravity plugins, restart each host, then repeat the source, version/host,
+   and start/stop checks. Confirm they resolve the merged default-branch commit
    rather than a temporary candidate or cached copy.
 4. Create and push an annotated `vX.Y.Z` tag from the merged commit, then
    publish the matching GitHub Release with curated notes. Summarize user-visible
@@ -96,8 +98,8 @@ For every path:
    directing users to update their marketplace installation.
 
 Cadence Code deliberately uses the generic GitHub tag `vX.Y.Z` because one
-repository release serves Codex, Claude Code, and Antigravity. Current Claude Code's
-`claude plugin tag` command instead proposes the plugin-specific
+repository release serves Codex, Claude Code, Cursor, and Antigravity. Current
+Claude Code's `claude plugin tag` command instead proposes the plugin-specific
 `cadence-code--vX.Y.Z` convention. That Claude-specific tag is not required for
 default-branch marketplace refreshes and must not replace the generic tag on a
 GitHub Release; the existing release verification intentionally continues to
