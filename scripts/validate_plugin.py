@@ -57,6 +57,8 @@ def validate_antigravity_development_mcp(failures: list[str]) -> None:
         failures.append("Antigravity development MCP must use the checkout bootstrap")
     if server.get("cwd") != ".":
         failures.append("Antigravity development MCP must run from the checkout root")
+    if server.get("timeoutSeconds") != 1800:
+        failures.append("Antigravity development MCP must allow long model setup")
 
 
 def main() -> int:
@@ -102,6 +104,8 @@ def main() -> int:
         failures.append("Antigravity MCP server must use the installed bootstrap")
     if antigravity_server.get("cwd") != "${extensionPath}":
         failures.append("Antigravity MCP server must run from its plugin root")
+    if antigravity_server.get("timeoutSeconds") != 1800:
+        failures.append("Antigravity MCP server must allow long model setup")
 
     validate_development_skills(failures)
     validate_antigravity_development_mcp(failures)

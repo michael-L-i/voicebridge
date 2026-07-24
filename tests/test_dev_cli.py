@@ -281,6 +281,7 @@ class DevCliTests(unittest.TestCase):
             ],
         )
         self.assertEqual(server["cwd"], ".")
+        self.assertEqual(server["timeoutSeconds"], 1800)
 
     def test_agy_fresh_resets_onboarding_but_keeps_venv(self):
         with tempfile.TemporaryDirectory() as directory:

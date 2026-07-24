@@ -7,7 +7,8 @@
         "bash",
         "./bin/cadence-code-mcp-bootstrap"
       ],
-      "cwd": "."
+      "cwd": ".",
+      "timeoutSeconds": 1800
     }
   }
 }

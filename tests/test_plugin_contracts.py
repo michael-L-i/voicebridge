@@ -75,6 +75,7 @@ class PluginContractTests(unittest.TestCase):
             ],
         )
         self.assertEqual(server["cwd"], "${extensionPath}")
+        self.assertEqual(server["timeoutSeconds"], 1800)
 
     def test_start_talking_is_explicit_and_references_exact_tool_surface(self):
         skill = (ROOT / "skills/start-talking/SKILL.md").read_text(
