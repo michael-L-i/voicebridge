@@ -49,7 +49,7 @@ uv export --locked --no-dev --no-emit-project --no-annotate --no-header \
 Run `uv lock --check` before opening a pull request. CI also verifies that the
 committed export still exactly matches `uv.lock`.
 
-To inspect the checkout's MCP tools without installing either host plugin, run:
+To inspect the checkout's MCP tools without installing a host plugin, run:
 
 ```bash
 ./dev inspector
@@ -91,8 +91,21 @@ user-level Codex configuration is changed.
 Use `./dev codex --fresh` to repeat first-run model selection without rebuilding
 the development venv.
 
+Antigravity CLI uses the checkout's native workspace MCP configuration and the
+same Agent Skills:
+
+```bash
+./dev agy
+```
+
+Then invoke `/start-talking`, `/voice-settings`, `/jump-in`, or `/wrap-up`.
+Nothing is installed globally and no user-level Antigravity configuration is
+changed. Use `./dev agy --fresh` to repeat first-run setup without rebuilding
+the development venv.
+
 When you need to discard every local-development venv and configuration, first
-close Claude Code, Codex, and MCP Inspector sessions using Cadence Code, then run:
+close Claude Code, Codex, Antigravity, and MCP Inspector sessions using Cadence
+Code, then run:
 
 ```bash
 ./dev reset
@@ -120,7 +133,7 @@ cadence-code listen-test
 
 A full voice-mode change should be exercised through
 `voice_start`/`voice_speak`/`voice_interrupt`/`voice_listen`/`voice_stop` in a
-real Claude Code session. Note what you tested in the pull request; do not
+real supported host session. Note what you tested in the pull request; do not
 attach recordings unless everyone captured in them has consented.
 
 ## Pull requests

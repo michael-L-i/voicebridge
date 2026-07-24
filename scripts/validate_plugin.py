@@ -43,12 +43,32 @@ def validate_development_skills(failures: list[str]) -> None:
             )
 
 
+def validate_antigravity_development_mcp(failures: list[str]) -> None:
+    server = load_json(".agents/mcp_config.json").get("mcpServers", {}).get(
+        "cadence-code", {}
+    )
+    if server.get("command") != "env":
+        failures.append("Antigravity development MCP must launch through env")
+    if server.get("args") != [
+        "CADENCE_CODE_HOST=antigravity",
+        "bash",
+        "./bin/cadence-code-mcp-bootstrap",
+    ]:
+        failures.append("Antigravity development MCP must use the checkout bootstrap")
+    if server.get("cwd") != ".":
+        failures.append("Antigravity development MCP must run from the checkout root")
+    if server.get("timeoutSeconds") != 1800:
+        failures.append("Antigravity development MCP must allow long model setup")
+
+
 def main() -> int:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project = tomllib.load(file)["project"]
 
     claude = load_json(".claude-plugin/plugin.json")
     codex = load_json(".codex-plugin/plugin.json")
+    antigravity = load_json("plugin.json")
+    antigravity_mcp = load_json("mcp_config.json")
     version = project["version"]
 
     failures: list[str] = []
@@ -65,11 +85,36 @@ def main() -> int:
         failures.append("Codex MCP server must use the repository bootstrap")
     if (ROOT / ".mcp.json").exists():
         failures.append("Codex MCP configuration must be bundled in the manifest")
+    if antigravity.get("$schema") != (
+        "https://antigravity.google/schemas/v1/plugin.json"
+    ):
+        failures.append("Antigravity plugin must use the official schema")
+    if antigravity.get("name") != "cadence-code":
+        failures.append("Antigravity plugin name must be cadence-code")
+    antigravity_server = antigravity_mcp.get("mcpServers", {}).get(
+        "cadence-code", {}
+    )
+    if antigravity_server.get("command") != "env":
+        failures.append("Antigravity MCP server must launch through env")
+    if antigravity_server.get("args") != [
+        "CADENCE_CODE_HOST=antigravity",
+        "bash",
+        "${extensionPath}/bin/cadence-code-mcp-bootstrap"
+    ]:
+        failures.append("Antigravity MCP server must use the installed bootstrap")
+    if antigravity_server.get("cwd") != "${extensionPath}":
+        failures.append("Antigravity MCP server must run from its plugin root")
+    if antigravity_server.get("timeoutSeconds") != 1800:
+        failures.append("Antigravity MCP server must allow long model setup")
 
     validate_development_skills(failures)
+    validate_antigravity_development_mcp(failures)
 
     required_paths = [
+        ".agents/mcp_config.json",
         "bin/cadence-code-mcp-bootstrap",
+        "mcp_config.json",
+        "plugin.json",
         "commands/jump-in.md",
         "commands/start-talking.md",
         "commands/voice-settings.md",
